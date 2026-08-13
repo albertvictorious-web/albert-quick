@@ -1,0 +1,293 @@
+{
+  "colors": {
+    "surfaces": [
+      {
+        "name": "page",
+        "kind": "solid",
+        "bg": "#F8FAFC",
+        "on_bg": "#0F172A",
+        "on_bg_muted": "#475569",
+        "roles": {
+          "link": "#0284C7",
+          "error": "#BE123C",
+          "success": "#047857",
+          "warning": "#B45309",
+          "accent_text": "#0F766E"
+        }
+      },
+      {
+        "name": "panel",
+        "kind": "solid",
+        "bg": "#FFFFFF",
+        "on_bg": "#0F172A",
+        "on_bg_muted": "#475569",
+        "roles": {
+          "link": "#0284C7",
+          "error": "#BE123C",
+          "success": "#047857",
+          "warning": "#B45309",
+          "accent_text": "#0F766E"
+        }
+      },
+      {
+        "name": "sidebar",
+        "kind": "solid",
+        "bg": "#0F172A",
+        "on_bg": "#F8FAFC",
+        "on_bg_muted": "#94A3B8",
+        "roles": {
+          "link": "#38BDF8",
+          "error": "#FB7185",
+          "success": "#34D399",
+          "warning": "#FBBF24",
+          "accent_text": "#2DD4BF"
+        }
+      },
+      {
+        "name": "inverse",
+        "kind": "solid",
+        "bg": "#0F172A",
+        "on_bg": "#F8FAFC",
+        "on_bg_muted": "#CBD5E1",
+        "roles": {
+          "link": "#38BDF8",
+          "error": "#FB7185",
+          "success": "#34D399",
+          "warning": "#FBBF24",
+          "accent_text": "#2DD4BF"
+        }
+      },
+      {
+        "name": "hero",
+        "kind": "solid",
+        "bg": "#0F172A",
+        "on_bg": "#F8FAFC",
+        "on_bg_muted": "#94A3B8",
+        "roles": {
+          "link": "#38BDF8",
+          "error": "#FB7185",
+          "success": "#34D399",
+          "warning": "#FBBF24",
+          "accent_text": "#2DD4BF"
+        }
+      },
+      {
+        "name": "drawer",
+        "kind": "solid",
+        "bg": "#FFFFFF",
+        "on_bg": "#0F172A",
+        "on_bg_muted": "#475569",
+        "roles": {
+          "link": "#0284C7",
+          "error": "#BE123C",
+          "success": "#047857",
+          "warning": "#B45309",
+          "accent_text": "#0F766E"
+        }
+      }
+    ],
+    "accent": "#0F766E",
+    "on_accent": "#FFFFFF"
+  },
+  "typography": {
+    "fonts": {
+      "heading": "Plus Jakarta Sans Variable",
+      "heading_import": "@fontsource-variable/plus-jakarta-sans",
+      "body": "DM Sans Variable",
+      "body_import": "@fontsource-variable/dm-sans",
+      "mono": "IBM Plex Mono",
+      "mono_import": "@fontsource/ibm-plex-mono"
+    },
+    "scale_px": {
+      "display": 48,
+      "h1": 36,
+      "h2": 28,
+      "h3": 20,
+      "body": 16,
+      "caption": 14
+    }
+  },
+  "entry_surfaces": {
+    "/login": "Branded split screen login — left brand panel (#0F172A slate executive visual with QuickPro Leads CRM branding, key metrics showcase, and trust statements), right panel clean card with role selector (Admin / Marketing), login credentials form, and clear Indonesian error messaging",
+    "/": "Role-based CRM Dashboard shell — dark slate persistent sidebar (#0F172A) with user role badge, sticky topbar with global search and account menu, top KPI queue cards (unassigned, active leads, follow-ups needed today, conversion rate), tabbed lead queue view (Nasabah vs Pelamar Kerja), multi-filter controls, high-density table, and slide-over lead detail timeline drawer"
+  },
+  "visual_enhancers": {
+    "theme_archetype": "ARCHETYPE 4: SWISS & HIGH-CONTRAST / EXECUTIVE FINANCIAL B2B",
+    "status_badges": {
+      "nasabah_status": {
+        "Baru": {
+          "bg": "#E0F2FE",
+          "text": "#0369A1",
+          "border": "#BAE6FD",
+          "label_id": "Baru"
+        },
+        "Diproses": {
+          "bg": "#EEF2FF",
+          "text": "#3730A3",
+          "border": "#C7D2FE",
+          "label_id": "Diproses"
+        },
+        "Follow Up": {
+          "bg": "#FEF3C7",
+          "text": "#92400E",
+          "border": "#FDE68A",
+          "label_id": "Follow Up",
+          "has_indicator": true
+        },
+        "Deal": {
+          "bg": "#D1FAE5",
+          "text": "#065F46",
+          "border": "#A7F3D0",
+          "label_id": "Deal"
+        },
+        "Gagal": {
+          "bg": "#FFE4E6",
+          "text": "#9F1239",
+          "border": "#FECDD3",
+          "label_id": "Gagal"
+        }
+      },
+      "pelamar_status": {
+        "Baru": {
+          "bg": "#E0F2FE",
+          "text": "#0369A1",
+          "border": "#BAE6FD",
+          "label_id": "Baru"
+        },
+        "Interview": {
+          "bg": "#F3E8FF",
+          "text": "#6B21A8",
+          "border": "#E9D5FF",
+          "label_id": "Interview"
+        },
+        "Diterima": {
+          "bg": "#D1FAE5",
+          "text": "#065F46",
+          "border": "#A7F3D0",
+          "label_id": "Diterima"
+        },
+        "Ditolak": {
+          "bg": "#F1F5F9",
+          "text": "#475569",
+          "border": "#CBD5E1",
+          "label_id": "Ditolak"
+        }
+      }
+    },
+    "timeline_style": "Vertical node line with user avatars, status badges, timestamp chips, and structured progress note blocks",
+    "follow_up_highlight": "Soft amber glow container border with pulsing notification badge for leads needing immediate attention today"
+  },
+  "grids_and_layouts": {
+    "dashboard_shell": "Sidebar + Topbar + Scrollable Canvas Layout",
+    "sidebar": {
+      "width_desktop": "260px",
+      "collapsible_mobile": true,
+      "bg_color": "#0F172A",
+      "active_item_bg": "#1E293B",
+      "active_item_border_left": "3px solid #0F766E"
+    },
+    "topbar": {
+      "height": "64px",
+      "bg_color": "#FFFFFF",
+      "border_bottom": "1px solid #E2E8F0"
+    },
+    "kpi_grid": "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6",
+    "content_padding": "p-4 sm:p-6 lg:p-8"
+  },
+  "role_views_and_permissions": {
+    "Admin": {
+      "access_scope": "Global (All Leads across all Marketing personnel)",
+      "capabilities": [
+        "View all Nasabah and Pelamar Kerja leads",
+        "Create new leads and assign to specific Marketing staff or leave unassigned",
+        "Reassign or transfer leads from one Marketing staff to another",
+        "Manage Marketing user accounts (Create account, set name, email, password, role)",
+        "Filter leads by Marketing Owner, Status, Lead Type, and Date Range",
+        "View team performance metrics and conversion rates"
+      ]
+    },
+    "Marketing": {
+      "access_scope": "Restricted Isolation (Only leads explicitly assigned to current logged-in Marketing user ID)",
+      "capabilities": [
+        "View personal assigned Nasabah and Pelamar Kerja leads queue",
+        "Update progress status (e.g. Baru -> Follow Up -> Deal)",
+        "Add timestamped progress notes and activity logs to assigned leads",
+        "Filter personal leads by Status, Lead Type, and Follow-Up urgency",
+        "Cannot view, edit, or search leads assigned to other marketing personnel"
+      ]
+    }
+  },
+  "lead_types_specification": {
+    "Nasabah": {
+      "title_id": "Data Leads Nasabah",
+      "description": "Leads calon nasabah dan produk keuangan / perbankan",
+      "fields": [
+        {"key": "nama", "label": "Nama Lengkap", "required": true},
+        {"key": "no_hp", "label": "No. WhatsApp / HP", "required": true},
+        {"key": "email", "label": "Email", "required": false},
+        {"key": "alamat", "label": "Alamat Lengkap", "required": false},
+        {"key": "produk", "label": "Produk / Kebutuhan", "required": true, "options": ["KPR / Kredit Pemilikan Rumah", "Deposito Berjangka", "Tabungan Bisnis", "Kredit Usaha Rakyat (KUR)", "Kartu Kredit Corporate", "Asuransi / Bancassurance"]},
+        {"key": "sumber", "label": "Sumber Leads", "required": true, "options": ["Website QuickPro", "Meta Ads (Facebook/IG)", "Referral Sales", "Walk-in Branch", "Telemarketing", "Pameran / Event"]},
+        {"key": "status", "label": "Status Leads", "options": ["Baru", "Diproses", "Follow Up", "Deal", "Gagal"]},
+        {"key": "catatan", "label": "Catatan Awal / Progres", "required": false}
+      ]
+    },
+    "Pelamar Kerja": {
+      "title_id": "Data Leads Pelamar Kerja",
+      "description": "Leads calon karyawan dan pelamar posisi pekerjaan",
+      "fields": [
+        {"key": "nama", "label": "Nama Lengkap", "required": true},
+        {"key": "no_hp", "label": "No. WhatsApp / HP", "required": true},
+        {"key": "email", "label": "Email", "required": true},
+        {"key": "posisi", "label": "Posisi Dilamar", "required": true, "options": ["Sales Executive", "Marketing Officer", "Admin Staff", "Digital Marketer", "Branch Supervisor", "Customer Service"]},
+        {"key": "nik", "label": "NIK (16 Digit)", "required": true},
+        {"key": "tanggal_lahir", "label": "Tanggal Lahir", "required": true},
+        {"key": "sumber", "label": "Sumber Leads", "required": true, "options": ["JobStreet", "LinkedIn", "Instagram Career", "Referral Internal", "Website Karir", "Bursa Kerja / Job Fair"]},
+        {"key": "status", "label": "Status Pelamar", "options": ["Baru", "Interview", "Diterima", "Ditolak"]},
+        {"key": "catatan", "label": "Catatan Kualifikasi", "required": false}
+      ]
+    }
+  },
+  "image_urls": {
+    "avatars": [
+      {
+        "url": "https://images.unsplash.com/photo-1622902141397-a89655353bec?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NjZ8MHwxfHNlYXJjaHwzfHxpbmRvbmVzaWFuJTIwYnVzaW5lc3MlMjBwcm9mZXNzaW9uYWwlMjBhdmF0YXIlMjBwb3J0cmFpdHxlbnwwfHx8fDE3ODY2NDI4MTd8MA&ixlib=rb-4.1.0&q=85",
+        "category": "admin_avatar",
+        "description": "Indonesian male executive suit portrait"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1626499370263-b2a0501f2773?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NjZ8MHwxfHNlYXJjaHDFHxpbmRvbmVzaWFuJTIwYnVzaW5lc3MlMjBwcm9mZXNzaW9uYWwlMjBhdmF0YXIlMjBwb3J0cmFpdHxlbnwwfHx8fDE3ODY2NDI4MTd8MA&ixlib=rb-4.1.0&q=85",
+        "category": "marketing_avatar_1",
+        "description": "Indonesian marketing officer avatar"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1648448942225-7aa06c7e8f79?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NjZ8MHwxfHNlYXJjaHwyfHxpbmRvbmVzaWFuJTIwYnVzaW5lc3MlMjBwcm9mZXNzaW9uYWwlMjBhdmF0YXIlMjBwb3J0cmFpdHxlbnwwfHx8fDE3ODY2NDI4MTd8MA&ixlib=rb-4.1.0&q=85",
+        "category": "marketing_avatar_2",
+        "description": "Indonesian business professional avatar"
+      }
+    ]
+  },
+  "component_styling_direction": {
+    "Table": "Clean high-density grid table with alternating row hover highlight (`hover:bg-slate-50/80`), sticky table header with subtle border, action column with slide-over drawer trigger, and clear empty state graphic",
+    "Badge": "Pill-shaped rounded-full status badges with border, 12px uppercase font, and subtle icon prefix",
+    "Card": "Flat surface `#FFFFFF` with 1px border `#E2E8F0`, rounded-xl (`rounded-xl`), soft shadow (`shadow-sm`), and generous padding (`p-5`)",
+    "Drawer/Sheet": "Slide-over panel from right (width: 600px desktop) containing complete lead details, timeline of progress notes, status update form, and lead assignment controller for Admin",
+    "Tabs": "Line-variant horizontal tab list (`Nasabah` and `Pelamar Kerja`) with active teal indicator bar and count badge"
+  },
+  "instructions_to_main_agent": [
+    "Use Indonesian language across all UI elements, labels, buttons, dialogs, status tags, and notification messages (e.g., 'QuickPro Leads CRM', 'Kelola Leads', 'Tugaskan Marketing', 'Tambah Catatan Progres', 'Follow-Up Hari Ini').",
+    "Implement session-based authentication with httpOnly cookie endpoint integration in FastAPI backend and frontend `lib/session.ts`.",
+    "Seed default users: Admin account (e.g. admin@quickpro.id / admin123) and Marketing accounts (e.g. marketing1@quickpro.id, marketing2@quickpro.id / password123).",
+    "Enforce strict data isolation: Marketing role API query must filter `assigned_to == current_user_id`. Backend MUST reject any request where a Marketing user tries to read or modify a lead assigned to another user.",
+    "Include sample seed data for both Nasabah (10+ realistic Indonesian customer leads with varied products and statuses) and Pelamar Kerja (10+ realistic applicant leads with varied positions and statuses).",
+    "Include follow-up date fields (`tanggal_follow_up`) on leads and prominent notification highlight banners for leads due today or overdue.",
+    "Add `data-testid` to all interactive buttons, inputs, filter selects, table rows, and status update submit forms for automated testing."
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "You MUST NOT apply universal transition like 'transition: all'. Apply targeted transitions like 'transition-colors duration-200'.",
+    "You MUST NOT center align the app container. Maintain clean left-aligned executive reading hierarchy.",
+    "Include data-testid on every interactive button, input, tab, select, and table row (kebab-case format).",
+    "Use Sonner for toast notifications on lead creation, status updates, note addition, and lead assignment.",
+    "Ensure strict TypeScript compliance with zero type errors (`yarn typecheck`)."
+  ]
+}
