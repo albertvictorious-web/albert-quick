@@ -6,9 +6,11 @@ import AppShell from "@/components/AppShell";
 import ProtectedRoute, { useMe } from "@/components/ProtectedRoute";
 import StatusBadge from "@/components/StatusBadge";
 import LeadDetailSheet from "@/components/LeadDetailSheet";
+import TeamPerformanceChart from "@/components/TeamPerformanceChart";
 import { Card, CardContent } from "@/components/ui/card";
 import { apiGet } from "@/lib/api";
 import type { Lead, LeadStats } from "@/lib/types";
+import { TERMINAL_STATUSES } from "@/lib/types";
 
 function KpiCard({
   label,
@@ -54,7 +56,8 @@ function DashboardContent() {
 
   const today = new Date().toISOString().slice(0, 10);
   const followUps = (leads ?? []).filter(
-    (l) => l.tanggal_follow_up && l.tanggal_follow_up <= today
+    (l) =>
+      l.tanggal_follow_up && l.tanggal_follow_up <= today && !TERMINAL_STATUSES.includes(l.status)
   );
   const recent = (leads ?? []).slice(0, 6);
 
@@ -127,6 +130,8 @@ function DashboardContent() {
           </div>
         </div>
       )}
+
+      {me?.role === "admin" && <TeamPerformanceChart />}
 
       <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
         <div className="mb-4 flex items-center justify-between">

@@ -7,16 +7,84 @@ from lib.auth import get_current_admin, get_current_user
 from lib.db import db
 from models.lead import (
     AssignRequest,
+    BulkAssignRequest,
+    BulkAssignResult,
+    FollowUpNotification,
     Lead,
     LeadCreate,
     LeadStats,
     LeadUpdate,
     NoteCreate,
     ProgressNote,
+    TeamPerformance,
 )
 from models.user import UserPublic
 
 router = APIRouter()
+
+# A lead in one of these statuses is closed — it never needs another follow-up nudge.
+TERMINAL_STATUSES = {"Deal", "Gagal", "Diterima", "Ditolak"}
+WON_STATUSES = {"Deal", "Diterima"}
+LOST_STATUSES = {"Gagal", "Ditolak"}
+
+
+@router.get("/leads/team-performance", response_model=List[TeamPerformance])
+async def team_performance(admin: dict = Depends(get_current_admin)):
+    """Per-marketing lead totals and conversion rate. Admin-only team view."""
+    marketing = await db.users.find({"role": "marketing"}).sort("name", 1).to_list(1000)
+    buckets: dict = {
+        m["id"]: {"marketing_id": m["id"], "marketing_name": m["name"], "rows": []}
+        for m in marketing
+    }
+    unassigned: list = []
+
+    docs = await db.leads.find({}).to_list(5000)
+    for d in docs:
+        owner = d.get("assigned_to")
+        if owner in buckets:
+            buckets[owner]["rows"].append(d)
+        else:
+            unassigned.append(d)
+
+    def build(name: str, rows: list, marketing_id: Optional[str]) -> TeamPerformance:
+        total = len(rows)
+        won = sum(1 for r in rows if r["status"] in WON_STATUSES)
+        lost = sum(1 for r in rows if r["status"] in LOST_STATUSES)
+        return TeamPerformance(
+            marketing_id=marketing_id,
+            marketing_name=name,
+            total=total,
+            open=total - won - lost,
+            closed_won=won,
+            closed_lost=lost,
+            conversion_rate=round(won / total * 100, 1) if total else 0.0,
+        )
+
+    result = [build(b["marketing_name"], b["rows"], b["marketing_id"]) for b in buckets.values()]
+    if unassigned:
+        result.append(build("Belum Ditugaskan", unassigned, None))
+    return result
+
+
+@router.post("/leads/bulk-assign", response_model=BulkAssignResult)
+async def bulk_assign(body: BulkAssignRequest, admin: dict = Depends(get_current_admin)):
+    """Assign many leads to one marketing user in a single action. Admin-only."""
+    if not body.lead_ids:
+        raise HTTPException(status_code=400, detail="Pilih minimal satu leads")
+    target = await db.users.find_one({"id": body.assigned_to, "role": "marketing"})
+    if not target:
+        raise HTTPException(status_code=400, detail="Marketing tujuan tidak ditemukan")
+    result = await db.leads.update_many(
+        {"id": {"$in": body.lead_ids}},
+        {
+            "$set": {
+                "assigned_to": target["id"],
+                "assigned_to_name": target["name"],
+                "updated_at": datetime.now(timezone.utc),
+            }
+        },
+    )
+    return BulkAssignResult(updated=result.modified_count, assigned_to_name=target["name"])
 
 
 @router.get("/leads/assignable-marketing", response_model=List[UserPublic])
@@ -24,6 +92,34 @@ async def assignable_marketing(user: dict = Depends(get_current_user)):
     """Any authenticated user can see the marketing roster to assign/transfer a lead."""
     users = await db.users.find({"role": "marketing"}).sort("name", 1).to_list(1000)
     return [UserPublic(**u) for u in users]
+
+
+@router.get("/leads/notifications", response_model=List[FollowUpNotification])
+async def follow_up_notifications(user: dict = Depends(get_current_user)):
+    """Leads whose follow-up date has arrived or passed and are still open.
+
+    Role-scoped exactly like /leads: a marketing user only ever sees their own leads.
+    """
+    today = datetime.now(timezone.utc).date().isoformat()
+    query: dict = {
+        "tanggal_follow_up": {"$ne": None, "$lte": today},
+        "status": {"$nin": list(TERMINAL_STATUSES)},
+    }
+    if user["role"] == "marketing":
+        query["assigned_to"] = user["id"]
+    docs = await db.leads.find(query).sort("tanggal_follow_up", 1).to_list(200)
+    return [
+        FollowUpNotification(
+            id=d["id"],
+            nama=d["nama"],
+            type=d["type"],
+            status=d["status"],
+            tanggal_follow_up=d["tanggal_follow_up"],
+            assigned_to_name=d.get("assigned_to_name"),
+            overdue=d["tanggal_follow_up"] < today,
+        )
+        for d in docs
+    ]
 
 
 async def get_lead_or_404(lead_id: str) -> dict:
@@ -49,6 +145,9 @@ async def list_leads(
     query: dict = {}
     if user["role"] == "marketing":
         query["assigned_to"] = user["id"]
+    elif assigned_to == "unassigned":
+        # Admin-only view of the pool waiting to be handed out.
+        query["assigned_to"] = None
     elif assigned_to:
         query["assigned_to"] = assigned_to
     if type:
@@ -82,7 +181,11 @@ async def leads_stats(user: dict = Depends(get_current_user)):
         by_type[d["type"]] = by_type.get(d["type"], 0) + 1
         name = d.get("assigned_to_name") or "Belum Ditugaskan"
         by_marketing[name] = by_marketing.get(name, 0) + 1
-        if d.get("tanggal_follow_up") and d["tanggal_follow_up"] <= today:
+        if (
+            d.get("tanggal_follow_up")
+            and d["tanggal_follow_up"] <= today
+            and d["status"] not in TERMINAL_STATUSES
+        ):
             follow_up_today += 1
     return LeadStats(
         total=total,

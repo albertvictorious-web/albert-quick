@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Plus, Search } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Plus, Search, Users } from "lucide-react";
+import { toast } from "sonner";
 import AppShell from "@/components/AppShell";
 import ProtectedRoute, { useMe } from "@/components/ProtectedRoute";
 import StatusBadge from "@/components/StatusBadge";
@@ -8,6 +9,7 @@ import LeadFormDialog from "@/components/LeadFormDialog";
 import LeadDetailSheet from "@/components/LeadDetailSheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectTrigger,
@@ -17,22 +19,33 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { apiGet } from "@/lib/api";
-import { NASABAH_STATUSES, PELAMAR_STATUSES, type Lead, type LeadType, type UserPublic } from "@/lib/types";
+import { apiGet, apiPost, ApiError } from "@/lib/api";
+import {
+  NASABAH_STATUSES,
+  PELAMAR_STATUSES,
+  type BulkAssignResult,
+  type Lead,
+  type LeadType,
+  type UserPublic,
+} from "@/lib/types";
 
 function LeadsContent() {
   const { data: me } = useMe();
+  const isAdmin = me?.role === "admin";
   const [type, setType] = useState<LeadType>("nasabah");
   const [status, setStatus] = useState("all");
   const [assignedTo, setAssignedTo] = useState("all");
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [activeLeadId, setActiveLeadId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkAssignTo, setBulkAssignTo] = useState("");
+  const queryClient = useQueryClient();
 
   const { data: marketingList } = useQuery<UserPublic[]>({
     queryKey: ["assignable-marketing"],
     queryFn: () => apiGet<UserPublic[]>("/leads/assignable-marketing"),
-    enabled: me?.role === "admin",
+    enabled: isAdmin,
   });
 
   const { data: leads, isLoading, error } = useQuery<Lead[]>({
@@ -41,14 +54,50 @@ function LeadsContent() {
       const params = new URLSearchParams();
       params.set("type", type);
       if (status !== "all") params.set("status", status);
-      if (assignedTo !== "all" && me?.role === "admin") params.set("assigned_to", assignedTo);
+      if (assignedTo !== "all" && isAdmin) params.set("assigned_to", assignedTo);
       if (search) params.set("search", search);
       return apiGet<Lead[]>(`/leads?${params.toString()}`);
     },
   });
 
+  const bulkAssignMutation = useMutation({
+    mutationFn: () =>
+      apiPost<BulkAssignResult>("/leads/bulk-assign", {
+        lead_ids: selectedIds,
+        assigned_to: bulkAssignTo,
+      }),
+    onSuccess: (result) => {
+      toast.success(`${result.updated} leads ditugaskan ke ${result.assigned_to_name}`);
+      setSelectedIds([]);
+      setBulkAssignTo("");
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      queryClient.invalidateQueries({ queryKey: ["leads-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["team-performance"] });
+      queryClient.invalidateQueries({ queryKey: ["follow-up-notifications"] });
+    },
+    onError: (err) => {
+      const detail =
+        err instanceof ApiError &&
+        typeof err.body === "object" &&
+        err.body &&
+        "detail" in (err.body as Record<string, unknown>)
+          ? String((err.body as Record<string, unknown>).detail)
+          : "Gagal menugaskan leads";
+      toast.error(detail);
+    },
+  });
+
   const statusOptions = type === "nasabah" ? NASABAH_STATUSES : PELAMAR_STATUSES;
   const today = new Date().toISOString().slice(0, 10);
+  const rows = leads ?? [];
+  const allSelected = rows.length > 0 && selectedIds.length === rows.length;
+
+  const resetSelection = () => setSelectedIds([]);
+
+  const toggleOne = (id: string) =>
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  const toggleAll = () => setSelectedIds(allSelected ? [] : rows.map((r) => r.id));
 
   return (
     <div className="flex flex-col gap-5">
@@ -56,7 +105,7 @@ function LeadsContent() {
         <div>
           <h1 className="font-heading text-2xl font-bold text-[#0F172A]">Data Leads</h1>
           <p className="mt-1 text-sm text-[#475569]">
-            {me?.role === "admin"
+            {isAdmin
               ? "Kelola seluruh leads nasabah dan pelamar kerja tim marketing."
               : "Leads yang sedang Anda kelola. Marketing lain tidak dapat melihat data ini."}
           </p>
@@ -67,7 +116,14 @@ function LeadsContent() {
         </Button>
       </div>
 
-      <Tabs value={type} onValueChange={(v) => { setType(v as LeadType); setStatus("all"); }}>
+      <Tabs
+        value={type}
+        onValueChange={(v) => {
+          setType(v as LeadType);
+          setStatus("all");
+          resetSelection();
+        }}
+      >
         <TabsList>
           <TabsTrigger value="nasabah" data-testid="leads-tab-nasabah">
             Nasabah
@@ -85,11 +141,20 @@ function LeadsContent() {
             data-testid="leads-search-input"
             placeholder="Cari nama, no. HP, atau email..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              resetSelection();
+            }}
             className="pl-9"
           />
         </div>
-        <Select value={status} onValueChange={setStatus}>
+        <Select
+          value={status}
+          onValueChange={(v) => {
+            setStatus(v);
+            resetSelection();
+          }}
+        >
           <SelectTrigger data-testid="leads-filter-status" className="w-[170px]">
             <SelectValue>{(v) => (v === "all" ? "Semua Status" : (v as string))}</SelectValue>
           </SelectTrigger>
@@ -102,17 +167,28 @@ function LeadsContent() {
             ))}
           </SelectContent>
         </Select>
-        {me?.role === "admin" && (
-          <Select value={assignedTo} onValueChange={setAssignedTo}>
+        {isAdmin && (
+          <Select
+            value={assignedTo}
+            onValueChange={(v) => {
+              setAssignedTo(v);
+              resetSelection();
+            }}
+          >
             <SelectTrigger data-testid="leads-filter-marketing" className="w-[190px]">
               <SelectValue>
                 {(v) =>
-                  v === "all" ? "Semua Marketing" : marketingList?.find((m) => m.id === v)?.name
+                  v === "all"
+                    ? "Semua Marketing"
+                    : v === "unassigned"
+                      ? "Belum Ditugaskan"
+                      : marketingList?.find((m) => m.id === v)?.name
                 }
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Semua Marketing</SelectItem>
+              <SelectItem value="unassigned">Belum Ditugaskan</SelectItem>
               {marketingList?.map((m) => (
                 <SelectItem key={m.id} value={m.id}>
                   {m.name}
@@ -122,6 +198,42 @@ function LeadsContent() {
           </Select>
         )}
       </div>
+
+      {isAdmin && selectedIds.length > 0 && (
+        <div
+          data-testid="bulk-assign-toolbar"
+          className="flex flex-wrap items-center gap-3 rounded-xl border border-[#0F766E]/30 bg-[#F0FDFA] p-4"
+        >
+          <span className="flex items-center gap-2 text-sm font-semibold text-[#0F766E]">
+            <Users className="h-4 w-4" />
+            <span data-testid="bulk-assign-selected-count">{selectedIds.length}</span> leads dipilih
+          </span>
+          <Select value={bulkAssignTo} onValueChange={setBulkAssignTo}>
+            <SelectTrigger data-testid="bulk-assign-select" className="w-[200px] bg-white">
+              <SelectValue>
+                {(v) => marketingList?.find((m) => m.id === v)?.name || "Pilih marketing"}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {marketingList?.map((m) => (
+                <SelectItem key={m.id} value={m.id}>
+                  {m.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            data-testid="bulk-assign-submit-button"
+            disabled={!bulkAssignTo || bulkAssignMutation.isPending}
+            onClick={() => bulkAssignMutation.mutate()}
+          >
+            {bulkAssignMutation.isPending ? "Menugaskan..." : "Tugaskan Sekarang"}
+          </Button>
+          <Button variant="ghost" data-testid="bulk-assign-clear-button" onClick={resetSelection}>
+            Batalkan Pilihan
+          </Button>
+        </div>
+      )}
 
       {error && (
         <div className="rounded-xl border border-[#FECDD3] bg-[#FFE4E6] p-4 text-sm text-[#9F1239]">
@@ -133,6 +245,16 @@ function LeadsContent() {
         <Table>
           <TableHeader>
             <TableRow>
+              {isAdmin && (
+                <TableHead className="w-10">
+                  <Checkbox
+                    data-testid="bulk-select-all-checkbox"
+                    checked={allSelected}
+                    onCheckedChange={toggleAll}
+                    aria-label="Pilih semua leads"
+                  />
+                </TableHead>
+              )}
               <TableHead>Nama</TableHead>
               <TableHead>Kontak</TableHead>
               <TableHead>{type === "nasabah" ? "Produk" : "Posisi"}</TableHead>
@@ -144,27 +266,40 @@ function LeadsContent() {
           <TableBody>
             {isLoading && (
               <TableRow>
-                <TableCell colSpan={6} className="py-8 text-center text-sm text-[#94A3B8]">
+                <TableCell colSpan={isAdmin ? 7 : 6} className="py-8 text-center text-sm text-[#94A3B8]">
                   Memuat data...
                 </TableCell>
               </TableRow>
             )}
-            {!isLoading && (leads ?? []).length === 0 && (
+            {!isLoading && rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="py-8 text-center text-sm text-[#94A3B8]">
+                <TableCell colSpan={isAdmin ? 7 : 6} className="py-8 text-center text-sm text-[#94A3B8]">
                   Belum ada leads yang cocok dengan filter.
                 </TableCell>
               </TableRow>
             )}
-            {(leads ?? []).map((lead) => {
+            {rows.map((lead) => {
               const overdue = !!lead.tanggal_follow_up && lead.tanggal_follow_up <= today;
+              const selected = selectedIds.includes(lead.id);
               return (
                 <TableRow
                   key={lead.id}
                   data-testid={`lead-row-${lead.id}`}
                   onClick={() => setActiveLeadId(lead.id)}
-                  className="cursor-pointer transition-colors duration-200 hover:bg-slate-50/80"
+                  className={`cursor-pointer transition-colors duration-200 hover:bg-slate-50/80 ${
+                    selected ? "bg-[#F0FDFA]" : ""
+                  }`}
                 >
+                  {isAdmin && (
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        data-testid={`bulk-select-checkbox-${lead.id}`}
+                        checked={selected}
+                        onCheckedChange={() => toggleOne(lead.id)}
+                        aria-label={`Pilih ${lead.nama}`}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell className="font-medium text-[#0F172A]">{lead.nama}</TableCell>
                   <TableCell className="text-[#475569]">{lead.no_hp}</TableCell>
                   <TableCell className="text-[#475569]">

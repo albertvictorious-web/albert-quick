@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -12,7 +13,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import StatusBadge from "@/components/StatusBadge";
-import { apiGet, apiPost } from "@/lib/api";
+import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import {
   NASABAH_STATUSES,
   PELAMAR_STATUSES,
@@ -52,6 +53,7 @@ export default function LeadDetailSheet({
   const [noteText, setNoteText] = useState("");
   const [noteStatus, setNoteStatus] = useState("");
   const [assignTo, setAssignTo] = useState("");
+  const [newFollowUp, setNewFollowUp] = useState("");
   const queryClient = useQueryClient();
 
   const { data: lead } = useQuery<Lead>({
@@ -79,6 +81,7 @@ export default function LeadDetailSheet({
       queryClient.invalidateQueries({ queryKey: ["lead", leadId] });
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       queryClient.invalidateQueries({ queryKey: ["leads-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["follow-up-notifications"] });
     },
     onError: () => toast.error("Gagal menambahkan catatan"),
   });
@@ -91,8 +94,23 @@ export default function LeadDetailSheet({
       queryClient.invalidateQueries({ queryKey: ["lead", leadId] });
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       queryClient.invalidateQueries({ queryKey: ["leads-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["follow-up-notifications"] });
     },
     onError: () => toast.error("Gagal memindahkan leads"),
+  });
+
+  const rescheduleMutation = useMutation({
+    mutationFn: () =>
+      apiPatch<Lead>(`/leads/${leadId}`, { tanggal_follow_up: newFollowUp }),
+    onSuccess: () => {
+      toast.success("Jadwal follow up diperbarui");
+      setNewFollowUp("");
+      queryClient.invalidateQueries({ queryKey: ["lead", leadId] });
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      queryClient.invalidateQueries({ queryKey: ["leads-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["follow-up-notifications"] });
+    },
+    onError: () => toast.error("Gagal memperbarui jadwal follow up"),
   });
 
   if (!lead) return null;
@@ -159,6 +177,32 @@ export default function LeadDetailSheet({
                 {addNoteMutation.isPending ? "Menyimpan..." : "Tambah Catatan"}
               </Button>
             </div>
+          </div>
+
+          <div className="rounded-xl border border-[#E2E8F0] bg-white p-4">
+            <p className="mb-3 font-heading text-sm font-semibold text-[#0F172A]">
+              Jadwalkan Ulang Follow Up
+            </p>
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                data-testid="lead-reschedule-input"
+                value={newFollowUp}
+                onChange={(e) => setNewFollowUp(e.target.value)}
+                className="flex-1"
+              />
+              <Button
+                variant="outline"
+                data-testid="lead-reschedule-submit-button"
+                disabled={!newFollowUp || rescheduleMutation.isPending}
+                onClick={() => rescheduleMutation.mutate()}
+              >
+                Simpan Jadwal
+              </Button>
+            </div>
+            <p className="mt-2 text-[11px] text-[#94A3B8]">
+              Notifikasi follow up akan muncul otomatis saat tanggal ini tiba.
+            </p>
           </div>
 
           <div className="rounded-xl border border-[#E2E8F0] bg-white p-4">

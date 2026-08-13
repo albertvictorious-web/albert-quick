@@ -89,3 +89,33 @@ class LeadStats(BaseModel):
     by_type: dict
     by_marketing: dict
     follow_up_today: int
+
+
+class FollowUpNotification(BaseModel):
+    id: str
+    nama: str
+    type: Literal["nasabah", "pelamar"]
+    status: str
+    tanggal_follow_up: str
+    assigned_to_name: Optional[str] = None
+    overdue: bool
+
+
+class BulkAssignRequest(BaseModel):
+    lead_ids: List[str]
+    assigned_to: str
+
+
+class BulkAssignResult(BaseModel):
+    updated: int
+    assigned_to_name: str
+
+
+class TeamPerformance(BaseModel):
+    marketing_id: Optional[str] = None
+    marketing_name: str
+    total: int
+    open: int
+    closed_won: int
+    closed_lost: int
+    conversion_rate: float

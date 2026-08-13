@@ -26,8 +26,23 @@ Internal CRM for managing two lead types: **Nasabah** (customer/bank-product lea
 ## Key Flows
 - Login (`/login`) → Dashboard (`/`) with KPI cards, follow-up-today highlight banner, recent
   leads. `/leads` — tabbed table (Nasabah/Pelamar) with search/status/marketing filters, "Tambah
-  Leads" dialog, row click opens a detail Sheet with info, add-progress-note timeline, and
-  assign/transfer control. `/akun-marketing` (admin only) — create/delete marketing accounts.
+  Leads" dialog, row click opens a detail Sheet with info, add-progress-note timeline, reschedule
+  follow-up date, and assign/transfer control. `/akun-marketing` (admin only) — create/delete
+  marketing accounts.
+- **In-app follow-up notifications** (no email/WA): a bell in the topbar (present on every page)
+  polls `GET /api/leads/notifications` every 20s and shows the count of leads whose
+  `tanggal_follow_up` has arrived or passed and whose status is still open (terminal statuses
+  Deal/Gagal/Diterima/Ditolak are excluded). Newly-due leads also raise a sonner toast. Clicking a
+  notification opens that lead's detail sheet; rescheduling the follow-up date removes it from the
+  list. The endpoint is role-scoped identically to `/leads` — marketing only ever sees their own.
+- **Team performance chart** (admin only, on the dashboard): `GET /api/leads/team-performance`
+  (admin-only, 403 for marketing) returns per-marketing total / open / closed_won / closed_lost /
+  conversion_rate, plus a "Belum Ditugaskan" row. Rendered as a grouped recharts bar chart with a
+  top-performer chip and per-marketing summary tiles. Won = Deal|Diterima, Lost = Gagal|Ditolak.
+- **Bulk assign** (admin only, on `/leads`): a checkbox column plus select-all reveals a toolbar
+  with a marketing picker; `POST /api/leads/bulk-assign {lead_ids, assigned_to}` (admin-only; 400
+  on an empty list) assigns many leads at once. The marketing filter has a "Belum Ditugaskan"
+  option (`GET /api/leads?assigned_to=unassigned`) for working the unassigned pool.
 - No third-party integrations used; auth is self-hosted (passlib bcrypt + PyJWT).
 
 ## Seed Data

@@ -1,8 +1,11 @@
 import type { ReactNode } from "react";
+import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { LayoutDashboard, Users2, UserCog, LogOut, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useMe } from "@/components/ProtectedRoute";
+import NotificationBell from "@/components/NotificationBell";
+import LeadDetailSheet from "@/components/LeadDetailSheet";
 import { endSession } from "@/lib/session";
 
 const NAV_ITEMS = [
@@ -15,6 +18,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const { data: user } = useMe();
   const location = useLocation();
   const navigate = useNavigate();
+  const [notifLeadId, setNotifLeadId] = useState<string | null>(null);
 
   const handleLogout = async () => {
     await endSession();
@@ -85,22 +89,27 @@ export default function AppShell({ children }: { children: ReactNode }) {
                   : "Akun Marketing"}
             </p>
           </div>
-          <div className="flex items-center gap-2 md:hidden">
-            <span data-testid="mobile-user-name" className="text-sm font-medium text-[#0F172A]">
-              {user?.name}
-            </span>
-            <button
-              type="button"
-              data-testid="logout-button-mobile"
-              onClick={handleLogout}
-              className="rounded-md bg-[#0F172A] p-2 text-white"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
+          <div className="flex items-center gap-3">
+            <NotificationBell onSelectLead={setNotifLeadId} />
+            <div className="flex items-center gap-2 md:hidden">
+              <span data-testid="mobile-user-name" className="text-sm font-medium text-[#0F172A]">
+                {user?.name}
+              </span>
+              <button
+                type="button"
+                data-testid="logout-button-mobile"
+                onClick={handleLogout}
+                className="rounded-md bg-[#0F172A] p-2 text-white"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </header>
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
+
+      <LeadDetailSheet leadId={notifLeadId} onOpenChange={(open) => !open && setNotifLeadId(null)} />
     </div>
   );
 }

@@ -52,6 +52,37 @@ export interface LeadStats {
   follow_up_today: number;
 }
 
+// Mirrors FollowUpNotification in backend/models/lead.py
+export interface FollowUpNotification {
+  id: string;
+  nama: string;
+  type: LeadType;
+  status: string;
+  tanggal_follow_up: string;
+  assigned_to_name?: string | null;
+  overdue: boolean;
+}
+
+// Mirrors TeamPerformance in backend/models/lead.py
+export interface TeamPerformance {
+  marketing_id?: string | null;
+  marketing_name: string;
+  total: number;
+  open: number;
+  closed_won: number;
+  closed_lost: number;
+  conversion_rate: number;
+}
+
+// Mirrors BulkAssignResult in backend/models/lead.py
+export interface BulkAssignResult {
+  updated: number;
+  assigned_to_name: string;
+}
+
+// A lead in one of these statuses is closed — mirrors TERMINAL_STATUSES in routers/leads.py
+export const TERMINAL_STATUSES = ["Deal", "Gagal", "Diterima", "Ditolak"];
+
 export const NASABAH_STATUSES = ["Baru", "Diproses", "Follow Up", "Deal", "Gagal"] as const;
 export const PELAMAR_STATUSES = ["Baru", "Interview", "Diterima", "Ditolak"] as const;
 
