@@ -28,16 +28,6 @@ export default function Login() {
     },
   });
 
-  const fillDemo = (role: "admin" | "marketing") => {
-    if (role === "admin") {
-      setEmail("admin@quickpro.id");
-      setPassword("admin123");
-    } else {
-      setEmail("rina@quickpro.id");
-      setPassword("password123");
-    }
-  };
-
   return (
     <div className="flex min-h-svh bg-[#F8FAFC]">
       <div className="relative hidden w-1/2 flex-col justify-between overflow-hidden bg-[#0F172A] p-12 text-white lg:flex">
@@ -141,26 +131,6 @@ export default function Login() {
               {loginMutation.isPending ? "Memproses..." : "Masuk"}
             </Button>
           </form>
-
-          <div className="mt-6 flex items-center gap-2 text-xs text-[#94A3B8]">
-            <span>Coba demo:</span>
-            <button
-              type="button"
-              data-testid="login-demo-admin-button"
-              onClick={() => fillDemo("admin")}
-              className="rounded-full border border-[#E2E8F0] px-2.5 py-1 font-medium text-[#0F766E] transition-colors duration-200 hover:bg-[#F0FDFA]"
-            >
-              Admin
-            </button>
-            <button
-              type="button"
-              data-testid="login-demo-marketing-button"
-              onClick={() => fillDemo("marketing")}
-              className="rounded-full border border-[#E2E8F0] px-2.5 py-1 font-medium text-[#0284C7] transition-colors duration-200 hover:bg-[#F0F9FF]"
-            >
-              Marketing
-            </button>
-          </div>
         </div>
       </div>
     </div>
