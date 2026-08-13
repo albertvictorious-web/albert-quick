@@ -119,3 +119,6 @@ class TeamPerformance(BaseModel):
     closed_won: int
     closed_lost: int
     conversion_rate: float
+    target_deals: int = 0
+    achieved_this_month: int = 0
+    target_progress: float = 0.0

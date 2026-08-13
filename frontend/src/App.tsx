@@ -3,6 +3,7 @@ import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import Leads from "@/pages/Leads";
 import MarketingAccounts from "@/pages/MarketingAccounts";
+import TransferHistory from "@/pages/TransferHistory";
 import { Toaster } from "@/components/ui/sonner";
 
 // One <Route> per page in src/pages; BrowserRouter already wraps this in main.tsx.
@@ -15,6 +16,7 @@ export default function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/leads" element={<Leads />} />
         <Route path="/akun-marketing" element={<MarketingAccounts />} />
+        <Route path="/riwayat-perpindahan" element={<TransferHistory />} />
       </Routes>
     </>
   );

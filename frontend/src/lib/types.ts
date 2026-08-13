@@ -72,7 +72,47 @@ export interface TeamPerformance {
   closed_won: number;
   closed_lost: number;
   conversion_rate: number;
+  target_deals: number;
+  achieved_this_month: number;
+  target_progress: number;
 }
+
+// Mirrors MarketingTarget in backend/models/ops.py
+export interface MarketingTarget {
+  marketing_id: string;
+  marketing_name: string;
+  month: string;
+  target_deals: number;
+  achieved: number;
+  progress: number;
+}
+
+// Mirrors Transfer in backend/models/ops.py
+export interface Transfer {
+  id: string;
+  lead_id: string;
+  lead_nama: string;
+  from_id?: string | null;
+  from_name: string;
+  to_id: string;
+  to_name: string;
+  by_id: string;
+  by_name: string;
+  mode: string;
+  created_at: string;
+}
+
+// Mirrors AutoDistributeResult in backend/models/ops.py
+export interface AutoDistributeResult {
+  distributed: number;
+  per_marketing: Record<string, number>;
+}
+
+export const TRANSFER_MODE_LABELS: Record<string, string> = {
+  single: "Manual",
+  bulk: "Bulk Assign",
+  auto: "Auto Bagi Rata",
+};
 
 // Mirrors BulkAssignResult in backend/models/lead.py
 export interface BulkAssignResult {

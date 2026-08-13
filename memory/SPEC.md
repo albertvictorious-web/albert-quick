@@ -43,6 +43,23 @@ Internal CRM for managing two lead types: **Nasabah** (customer/bank-product lea
   with a marketing picker; `POST /api/leads/bulk-assign {lead_ids, assigned_to}` (admin-only; 400
   on an empty list) assigns many leads at once. The marketing filter has a "Belum Ditugaskan"
   option (`GET /api/leads?assigned_to=unassigned`) for working the unassigned pool.
+- **CSV export**: "Export CSV" on `/leads` is an `<a href>` to `GET /api/leads/export`, carrying
+  the current tab/status/marketing/search filters. The session cookie rides the navigation, so the
+  file is role-scoped (a marketing user only ever exports their own rows). UTF-8 with BOM so Excel
+  reads Indonesian names correctly; filename `leads-quickpro-YYYYMMDD.csv`.
+- **Auto bagi rata (round robin)**: admin opens the dialog on `/leads`, ticks which marketing users
+  take part, and `POST /api/leads/auto-distribute {marketing_ids, type}` spreads every unassigned
+  lead of that type across them in turn (400 if no marketing picked or the pool is empty).
+- **Monthly deal targets**: `db.targets` holds one doc per {marketing_id, month}. Admin sets a
+  per-person number for the current month in the "Target Deal Bulanan" panel on `/akun-marketing`
+  (`GET /api/targets`, `PUT /api/targets`, both admin-only). Marketing sees their own card on the
+  dashboard via `GET /api/targets/me`. Progress counts won leads (Deal|Diterima) whose `closed_at`
+  falls in that month — `closed_at` is stamped when a status change first turns a lead won, with a
+  fallback to `updated_at` for older rows. Target + progress are also returned by
+  `/api/leads/team-performance` and drawn under each marketing tile in the chart.
+- **Transfer history**: every hand-over writes to `db.transfers` (lead, from, to, actor, mode:
+  single|bulk|auto, timestamp) from the single-assign, bulk-assign and auto-distribute paths.
+  Admin-only page `/riwayat-perpindahan` lists them newest-first (`GET /api/transfers`).
 - No third-party integrations used; auth is self-hosted (passlib bcrypt + PyJWT).
 
 ## Seed Data

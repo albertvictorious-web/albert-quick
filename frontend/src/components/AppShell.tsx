@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users2, UserCog, LogOut, Sparkles } from "lucide-react";
+import { LayoutDashboard, Users2, UserCog, LogOut, Sparkles, History } from "lucide-react";
 import { toast } from "sonner";
 import { useMe } from "@/components/ProtectedRoute";
 import NotificationBell from "@/components/NotificationBell";
@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, adminOnly: false },
   { to: "/leads", label: "Data Leads", icon: Users2, adminOnly: false },
   { to: "/akun-marketing", label: "Akun Marketing", icon: UserCog, adminOnly: true },
+  { to: "/riwayat-perpindahan", label: "Riwayat Perpindahan", icon: History, adminOnly: true },
 ];
 
 export default function AppShell({ children }: { children: ReactNode }) {
@@ -82,11 +83,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <header className="flex h-16 items-center justify-between border-b border-[#E2E8F0] bg-white px-4 sm:px-6">
           <div>
             <p className="font-heading text-lg font-bold text-[#0F172A]">
-              {location.pathname === "/"
-                ? "Dashboard"
-                : location.pathname.startsWith("/leads")
-                  ? "Data Leads"
-                  : "Akun Marketing"}
+              {NAV_ITEMS.find((item) => item.to === location.pathname)?.label ?? "QuickPro Leads CRM"}
             </p>
           </div>
           <div className="flex items-center gap-3">

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { UserPlus, Trash2 } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import MonthlyTargetsPanel from "@/components/MonthlyTargetsPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -155,6 +156,8 @@ function MarketingAccountsContent() {
       </div>
 
       <CreateMarketingDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+
+      <MonthlyTargetsPanel />
     </div>
   );
 }

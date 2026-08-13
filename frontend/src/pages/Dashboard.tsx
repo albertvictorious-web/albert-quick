@@ -7,6 +7,7 @@ import ProtectedRoute, { useMe } from "@/components/ProtectedRoute";
 import StatusBadge from "@/components/StatusBadge";
 import LeadDetailSheet from "@/components/LeadDetailSheet";
 import TeamPerformanceChart from "@/components/TeamPerformanceChart";
+import MyTargetCard from "@/components/MyTargetCard";
 import { Card, CardContent } from "@/components/ui/card";
 import { apiGet } from "@/lib/api";
 import type { Lead, LeadStats } from "@/lib/types";
@@ -132,6 +133,7 @@ function DashboardContent() {
       )}
 
       {me?.role === "admin" && <TeamPerformanceChart />}
+      {me?.role === "marketing" && <MyTargetCard />}
 
       <div className="rounded-xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
         <div className="mb-4 flex items-center justify-between">

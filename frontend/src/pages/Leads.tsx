@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Users } from "lucide-react";
+import { Plus, Search, Users, Download, Shuffle } from "lucide-react";
 import { toast } from "sonner";
 import AppShell from "@/components/AppShell";
 import ProtectedRoute, { useMe } from "@/components/ProtectedRoute";
 import StatusBadge from "@/components/StatusBadge";
 import LeadFormDialog from "@/components/LeadFormDialog";
 import LeadDetailSheet from "@/components/LeadDetailSheet";
-import { Button } from "@/components/ui/button";
+import AutoDistributeDialog from "@/components/AutoDistributeDialog";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -37,6 +38,7 @@ function LeadsContent() {
   const [assignedTo, setAssignedTo] = useState("all");
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
+  const [autoOpen, setAutoOpen] = useState(false);
   const [activeLeadId, setActiveLeadId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkAssignTo, setBulkAssignTo] = useState("");
@@ -92,6 +94,15 @@ function LeadsContent() {
   const rows = leads ?? [];
   const allSelected = rows.length > 0 && selectedIds.length === rows.length;
 
+  // Download link, not a fetch: the browser navigates to the relative /api path and the
+  // httpOnly session cookie rides along, so the CSV honours the same filters + role scope.
+  const exportParams = new URLSearchParams();
+  exportParams.set("type", type);
+  if (status !== "all") exportParams.set("status", status);
+  if (assignedTo !== "all" && isAdmin) exportParams.set("assigned_to", assignedTo);
+  if (search) exportParams.set("search", search);
+  const exportHref = `/api/leads/export?${exportParams.toString()}`;
+
   const resetSelection = () => setSelectedIds([]);
 
   const toggleOne = (id: string) =>
@@ -110,10 +121,30 @@ function LeadsContent() {
               : "Leads yang sedang Anda kelola. Marketing lain tidak dapat melihat data ini."}
           </p>
         </div>
-        <Button data-testid="open-add-lead-dialog-button" onClick={() => setFormOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Tambah Leads
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href={exportHref}
+            data-testid="export-csv-link"
+            className={buttonVariants({ variant: "outline" })}
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </a>
+          {isAdmin && (
+            <Button
+              variant="outline"
+              data-testid="open-auto-distribute-button"
+              onClick={() => setAutoOpen(true)}
+            >
+              <Shuffle className="h-4 w-4" />
+              Auto Bagi Rata
+            </Button>
+          )}
+          <Button data-testid="open-add-lead-dialog-button" onClick={() => setFormOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Tambah Leads
+          </Button>
+        </div>
       </div>
 
       <Tabs
@@ -328,6 +359,7 @@ function LeadsContent() {
       </div>
 
       <LeadFormDialog open={formOpen} onOpenChange={setFormOpen} defaultType={type} />
+      <AutoDistributeDialog open={autoOpen} onOpenChange={setAutoOpen} leadType={type} />
       <LeadDetailSheet leadId={activeLeadId} onOpenChange={(open) => !open && setActiveLeadId(null)} />
     </div>
   );

@@ -114,6 +114,23 @@ export default function TeamPerformanceChart() {
                   {r.total} leads · {r.closed_won} berhasil ·{" "}
                   <span className="font-semibold text-[#0F766E]">{r.conversion_rate}%</span>
                 </p>
+                {r.marketing_id && (
+                  <>
+                    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[#E2E8F0]">
+                      <div
+                        className="h-full rounded-full bg-[#B45309] transition-[width] duration-500"
+                        style={{ width: `${Math.min(r.target_progress, 100)}%` }}
+                      />
+                    </div>
+                    <p
+                      data-testid={`team-performance-target-${r.marketing_name.toLowerCase().replace(/\s+/g, "-")}`}
+                      className="mt-1 text-[11px] text-[#94A3B8]"
+                    >
+                      Target bulan ini: {r.achieved_this_month}/{r.target_deals || "-"} deal
+                      {r.target_deals ? ` (${r.target_progress}%)` : " (belum diatur)"}
+                    </p>
+                  </>
+                )}
               </div>
             ))}
           </div>

@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 
 from lib.auth import get_current_admin, get_current_user
 from lib.db import db
@@ -18,7 +18,10 @@ from models.lead import (
     ProgressNote,
     TeamPerformance,
 )
+from models.ops import AutoDistributeRequest, AutoDistributeResult
 from models.user import UserPublic
+from routers.targets import current_month, month_of
+from routers.transfers import log_transfers
 
 router = APIRouter()
 
@@ -30,7 +33,7 @@ LOST_STATUSES = {"Gagal", "Ditolak"}
 
 @router.get("/leads/team-performance", response_model=List[TeamPerformance])
 async def team_performance(admin: dict = Depends(get_current_admin)):
-    """Per-marketing lead totals and conversion rate. Admin-only team view."""
+    """Per-marketing lead totals, conversion rate and monthly-target progress. Admin-only."""
     marketing = await db.users.find({"role": "marketing"}).sort("name", 1).to_list(1000)
     buckets: dict = {
         m["id"]: {"marketing_id": m["id"], "marketing_name": m["name"], "rows": []}
@@ -46,10 +49,18 @@ async def team_performance(admin: dict = Depends(get_current_admin)):
         else:
             unassigned.append(d)
 
+    month = current_month()
+    target_rows = await db.targets.find({"month": month}).to_list(1000)
+    targets = {t["marketing_id"]: int(t["target_deals"]) for t in target_rows}
+
     def build(name: str, rows: list, marketing_id: Optional[str]) -> TeamPerformance:
         total = len(rows)
         won = sum(1 for r in rows if r["status"] in WON_STATUSES)
         lost = sum(1 for r in rows if r["status"] in LOST_STATUSES)
+        target = targets.get(marketing_id, 0) if marketing_id else 0
+        achieved = sum(
+            1 for r in rows if r["status"] in WON_STATUSES and month_of(r) == month
+        )
         return TeamPerformance(
             marketing_id=marketing_id,
             marketing_name=name,
@@ -58,12 +69,126 @@ async def team_performance(admin: dict = Depends(get_current_admin)):
             closed_won=won,
             closed_lost=lost,
             conversion_rate=round(won / total * 100, 1) if total else 0.0,
+            target_deals=target,
+            achieved_this_month=achieved,
+            target_progress=round(achieved / target * 100, 1) if target else 0.0,
         )
 
     result = [build(b["marketing_name"], b["rows"], b["marketing_id"]) for b in buckets.values()]
     if unassigned:
         result.append(build("Belum Ditugaskan", unassigned, None))
     return result
+
+
+@router.post("/leads/auto-distribute", response_model=AutoDistributeResult)
+async def auto_distribute(body: AutoDistributeRequest, admin: dict = Depends(get_current_admin)):
+    """Round-robin every unassigned lead across the marketing users the admin picked."""
+    if not body.marketing_ids:
+        raise HTTPException(status_code=400, detail="Pilih minimal satu marketing")
+    targets = []
+    for mid in body.marketing_ids:
+        found = await db.users.find_one({"id": mid, "role": "marketing"})
+        if not found:
+            raise HTTPException(status_code=400, detail="Akun marketing tidak ditemukan")
+        targets.append(found)
+
+    query: dict = {"assigned_to": None}
+    if body.type:
+        query["type"] = body.type
+    pool = await db.leads.find(query).sort("created_at", 1).to_list(2000)
+    if not pool:
+        raise HTTPException(status_code=400, detail="Tidak ada leads yang belum ditugaskan")
+
+    now = datetime.now(timezone.utc)
+    per_marketing: dict = {t["name"]: 0 for t in targets}
+    for index, lead in enumerate(pool):
+        target = targets[index % len(targets)]
+        await db.leads.update_one(
+            {"id": lead["id"]},
+            {
+                "$set": {
+                    "assigned_to": target["id"],
+                    "assigned_to_name": target["name"],
+                    "updated_at": now,
+                }
+            },
+        )
+        await log_transfers([lead], target, admin, "auto")
+        per_marketing[target["name"]] += 1
+
+    return AutoDistributeResult(distributed=len(pool), per_marketing=per_marketing)
+
+
+@router.get("/leads/export")
+async def export_leads(
+    type: Optional[str] = None,
+    status: Optional[str] = None,
+    assigned_to: Optional[str] = None,
+    search: Optional[str] = None,
+    user: dict = Depends(get_current_user),
+):
+    """CSV export of the current filter selection. Role-scoped exactly like GET /leads."""
+    docs = await db.leads.find(build_leads_query(user, type, status, assigned_to, search)).sort(
+        "created_at", -1
+    ).to_list(5000)
+
+    headers = [
+        "Nama",
+        "Tipe",
+        "No HP",
+        "Email",
+        "Alamat",
+        "Produk",
+        "Posisi",
+        "NIK",
+        "Tanggal Lahir",
+        "Sumber",
+        "Status",
+        "Tanggal Follow Up",
+        "Marketing",
+        "Jumlah Catatan",
+        "Dibuat",
+    ]
+
+    def cell(value: object) -> str:
+        text = "" if value is None else str(value)
+        # Minimal CSV quoting: escape embedded quotes, wrap anything with a separator.
+        text = text.replace('"', '""')
+        return f'"{text}"'
+
+    lines = [",".join(cell(h) for h in headers)]
+    for d in docs:
+        created = d.get("created_at")
+        lines.append(
+            ",".join(
+                cell(v)
+                for v in [
+                    d.get("nama"),
+                    "Nasabah" if d.get("type") == "nasabah" else "Pelamar Kerja",
+                    d.get("no_hp"),
+                    d.get("email"),
+                    d.get("alamat"),
+                    d.get("produk"),
+                    d.get("posisi"),
+                    d.get("nik"),
+                    d.get("tanggal_lahir"),
+                    d.get("sumber"),
+                    d.get("status"),
+                    d.get("tanggal_follow_up"),
+                    d.get("assigned_to_name") or "Belum Ditugaskan",
+                    len(d.get("notes") or []),
+                    created.strftime("%Y-%m-%d %H:%M") if isinstance(created, datetime) else "",
+                ]
+            )
+        )
+
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+    csv_body = "\ufeff" + "\n".join(lines)  # BOM so Excel reads UTF-8 names correctly
+    return Response(
+        content=csv_body,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="leads-quickpro-{stamp}.csv"'},
+    )
 
 
 @router.post("/leads/bulk-assign", response_model=BulkAssignResult)
@@ -74,6 +199,7 @@ async def bulk_assign(body: BulkAssignRequest, admin: dict = Depends(get_current
     target = await db.users.find_one({"id": body.assigned_to, "role": "marketing"})
     if not target:
         raise HTTPException(status_code=400, detail="Marketing tujuan tidak ditemukan")
+    previous = await db.leads.find({"id": {"$in": body.lead_ids}}).to_list(2000)
     result = await db.leads.update_many(
         {"id": {"$in": body.lead_ids}},
         {
@@ -84,6 +210,7 @@ async def bulk_assign(body: BulkAssignRequest, admin: dict = Depends(get_current
             }
         },
     )
+    await log_transfers(previous, target, admin, "bulk")
     return BulkAssignResult(updated=result.modified_count, assigned_to_name=target["name"])
 
 
@@ -134,14 +261,17 @@ def check_access(doc: dict, user: dict):
         raise HTTPException(status_code=403, detail="Anda tidak memiliki akses ke leads ini")
 
 
-@router.get("/leads", response_model=List[Lead])
-async def list_leads(
+def build_leads_query(
+    user: dict,
     type: Optional[str] = None,
     status: Optional[str] = None,
     assigned_to: Optional[str] = None,
     search: Optional[str] = None,
-    user: dict = Depends(get_current_user),
-):
+) -> dict:
+    """One filter definition shared by the list and CSV-export endpoints.
+
+    Marketing scope is applied first and cannot be overridden by a query param.
+    """
     query: dict = {}
     if user["role"] == "marketing":
         query["assigned_to"] = user["id"]
@@ -160,6 +290,18 @@ async def list_leads(
             {"no_hp": {"$regex": search, "$options": "i"}},
             {"email": {"$regex": search, "$options": "i"}},
         ]
+    return query
+
+
+@router.get("/leads", response_model=List[Lead])
+async def list_leads(
+    type: Optional[str] = None,
+    status: Optional[str] = None,
+    assigned_to: Optional[str] = None,
+    search: Optional[str] = None,
+    user: dict = Depends(get_current_user),
+):
+    query = build_leads_query(user, type, status, assigned_to, search)
     docs = await db.leads.find(query).sort("created_at", -1).to_list(2000)
     return [Lead(**d) for d in docs]
 
@@ -237,6 +379,10 @@ async def update_lead(lead_id: str, body: LeadUpdate, user: dict = Depends(get_c
     updates = {k: v for k, v in body.model_dump().items() if v is not None}
     if updates:
         updates["updated_at"] = datetime.now(timezone.utc)
+        new_status = updates.get("status")
+        # Stamp the win date so monthly target progress can be counted per month.
+        if new_status in WON_STATUSES and doc.get("status") not in WON_STATUSES:
+            updates["closed_at"] = updates["updated_at"]
         await db.leads.update_one({"id": lead_id}, {"$set": updates})
     doc = await get_lead_or_404(lead_id)
     return Lead(**doc)
@@ -249,12 +395,15 @@ async def add_note(lead_id: str, body: NoteCreate, user: dict = Depends(get_curr
     note = ProgressNote(
         text=body.text, status=body.status, created_by=user["id"], created_by_name=user["name"]
     )
+    now = datetime.now(timezone.utc)
     update: dict = {
         "$push": {"notes": note.model_dump()},
-        "$set": {"updated_at": datetime.now(timezone.utc)},
+        "$set": {"updated_at": now},
     }
     if body.status:
         update["$set"]["status"] = body.status
+        if body.status in WON_STATUSES and doc.get("status") not in WON_STATUSES:
+            update["$set"]["closed_at"] = now
     await db.leads.update_one({"id": lead_id}, update)
     doc = await get_lead_or_404(lead_id)
     return Lead(**doc)
@@ -277,6 +426,7 @@ async def assign_lead(lead_id: str, body: AssignRequest, user: dict = Depends(ge
             }
         },
     )
+    await log_transfers([doc], target, user, "single")
     doc = await get_lead_or_404(lead_id)
     return Lead(**doc)
 

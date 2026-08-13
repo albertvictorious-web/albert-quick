@@ -18,6 +18,8 @@ load_dotenv(ROOT_DIR / '.env')
 from lib.db import client, db
 from routers.auth import router as auth_router
 from routers.leads import router as leads_router
+from routers.targets import router as targets_router
+from routers.transfers import router as transfers_router
 
 
 # Startup runs before the yield, shutdown after it. Add your own setup/teardown here.
@@ -63,6 +65,8 @@ async def get_status_checks():
 # QuickPro Leads CRM routers
 api_router.include_router(auth_router)
 api_router.include_router(leads_router)
+api_router.include_router(targets_router)
+api_router.include_router(transfers_router)
 
 # Include the router in the main app
 app.include_router(api_router)
