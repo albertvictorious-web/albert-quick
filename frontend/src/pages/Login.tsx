@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Sparkles, ShieldCheck, TrendingUp, Users } from "lucide-react";
+import { ShieldCheck, TrendingUp, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,9 +35,12 @@ export default function Login() {
         <div className="absolute bottom-0 left-0 h-64 w-64 rounded-full bg-[#0284C7]/10 blur-3xl" />
 
         <div className="relative z-10 flex items-center gap-2.5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#0F766E]">
-            <Sparkles className="h-5 w-5 text-white" />
-          </div>
+          <img
+            src="/logo.png"
+            alt="Logo QuickPro Leads CRM"
+            data-testid="login-brand-logo"
+            className="h-10 w-10 rounded-lg object-contain"
+          />
           <span className="font-heading text-lg font-bold">QuickPro Leads CRM</span>
         </div>
 
@@ -72,9 +75,12 @@ export default function Login() {
       <div className="flex w-full items-center justify-center px-6 lg:w-1/2">
         <div className="w-full max-w-sm">
           <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#0F766E]">
-              <Sparkles className="h-5 w-5 text-white" />
-            </div>
+            <img
+              src="/logo.png"
+              alt="Logo QuickPro Leads CRM"
+              data-testid="login-brand-logo-mobile"
+              className="h-9 w-9 rounded-lg object-contain"
+            />
             <span className="font-heading text-lg font-bold text-[#0F172A]">QuickPro Leads CRM</span>
           </div>
 

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Users2, UserCog, LogOut, Sparkles, History } from "lucide-react";
+import { LayoutDashboard, Users2, UserCog, LogOut, History } from "lucide-react";
 import { toast } from "sonner";
 import { useMe } from "@/components/ProtectedRoute";
 import NotificationBell from "@/components/NotificationBell";
@@ -31,9 +31,12 @@ export default function AppShell({ children }: { children: ReactNode }) {
     <div className="flex min-h-svh bg-[#F8FAFC]">
       <aside className="hidden w-[260px] flex-col bg-[#0F172A] px-4 py-6 md:flex">
         <div className="flex items-center gap-2 px-2 pb-8">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#0F766E]">
-            <Sparkles className="h-5 w-5 text-white" />
-          </div>
+          <img
+            src="/logo.png"
+            alt="Logo QuickPro Leads CRM"
+            data-testid="sidebar-brand-logo"
+            className="h-9 w-9 rounded-lg object-contain"
+          />
           <div>
             <p className="font-heading text-sm font-bold text-white leading-tight">QuickPro</p>
             <p className="text-[11px] text-[#94A3B8] leading-tight">Leads CRM</p>
