@@ -41,7 +41,7 @@ ALIASES: Dict[str, Tuple[str, ...]] = {
     "pernah_trading": ("pernah trading", "pengalaman trading", "sudah pernah trading", "trading",
                        "riwayat trading"),
     "sumber": ("sumber", "sumber leads", "source", "channel", "asal", "asal leads", "dari mana",
-               "media", "sumber informasi", "referensi"),
+               "media", "sumber informasi"),
     "pendidikan": ("pendidikan", "pendidikan terakhir", "education", "jenjang", "lulusan",
                    "jenjang pendidikan"),
     "status": ("status", "status leads", "stage", "tahap", "progress"),

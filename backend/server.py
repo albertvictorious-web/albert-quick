@@ -18,6 +18,7 @@ load_dotenv(ROOT_DIR / '.env')
 from lib.db import client, db
 from routers.auth import router as auth_router
 from routers.catatan import router as catatan_router
+from routers.custom_fields import router as custom_fields_router
 from routers.files import router as files_router
 from routers.jadwal import router as jadwal_router
 from routers.leads import router as leads_router
@@ -75,6 +76,7 @@ api_router.include_router(catatan_router)
 api_router.include_router(jadwal_router)
 api_router.include_router(files_router)
 api_router.include_router(rekap_router)
+api_router.include_router(custom_fields_router)
 
 # Include the router in the main app
 app.include_router(api_router)

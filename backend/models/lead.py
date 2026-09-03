@@ -50,6 +50,8 @@ class Lead(BaseModel):
     created_at: datetime = Field(default_factory=now_utc)
     updated_at: datetime = Field(default_factory=now_utc)
     notes: List[ProgressNote] = []
+    # Admin-defined extra columns, keyed by CustomField.key.
+    custom: Dict[str, str] = {}
 
 
 class LeadCreate(BaseModel):
@@ -68,6 +70,7 @@ class LeadCreate(BaseModel):
     catatan: Optional[str] = None
     tanggal_follow_up: Optional[str] = None
     assigned_to: Optional[str] = None
+    custom: Dict[str, str] = {}
 
 
 class LeadUpdate(BaseModel):
@@ -84,6 +87,7 @@ class LeadUpdate(BaseModel):
     status: Optional[str] = None
     catatan: Optional[str] = None
     tanggal_follow_up: Optional[str] = None
+    custom: Optional[Dict[str, str]] = None
 
 
 class AssignRequest(BaseModel):
@@ -175,6 +179,8 @@ class ImportPreview(BaseModel):
     sample_rows: List[Dict[str, str]]
     total_rows: int
     unmapped_headers: List[str]
+    # Custom columns that already exist, so a repeat import reuses them instead of duplicating.
+    existing_custom: List[ImportField] = []
 
 
 class UploadedFile(BaseModel):

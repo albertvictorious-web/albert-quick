@@ -19,6 +19,7 @@ import { waLink } from "@/lib/wa";
 import {
   NASABAH_STATUSES,
   PELAMAR_STATUSES,
+  type CustomField,
   type Lead,
   type UserPublic,
 } from "@/lib/types";
@@ -67,6 +68,12 @@ export default function LeadDetailSheet({
   const { data: marketingList } = useQuery<UserPublic[]>({
     queryKey: ["assignable-marketing"],
     queryFn: () => apiGet<UserPublic[]>("/leads/assignable-marketing"),
+    enabled: !!leadId,
+  });
+
+  const { data: customFields } = useQuery<CustomField[]>({
+    queryKey: ["custom-fields"],
+    queryFn: () => apiGet<CustomField[]>("/custom-fields"),
     enabled: !!leadId,
   });
 
@@ -221,6 +228,33 @@ export default function LeadDetailSheet({
               </div>
             )}
           </div>
+
+          {customFields && customFields.length > 0 && (
+            <div
+              data-testid="lead-custom-fields"
+              className="rounded-xl border border-[#E2E8F0] bg-white p-4"
+            >
+              <p className="mb-3 font-heading text-sm font-semibold text-[#0F172A]">
+                Kolom Custom
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                {customFields.map((field) => (
+                  <div
+                    key={field.key}
+                    data-testid={`lead-custom-value-${field.key}`}
+                    className="flex flex-col gap-0.5"
+                  >
+                    <span className="text-[11px] uppercase tracking-wide text-[#94A3B8]">
+                      {field.label}
+                    </span>
+                    <span className="text-sm text-[#0F172A]">
+                      {lead.custom?.[field.key] || "—"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="rounded-xl border border-[#E2E8F0] bg-white p-4">
             <p className="mb-3 font-heading text-sm font-semibold text-[#0F172A]">

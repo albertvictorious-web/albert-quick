@@ -18,6 +18,8 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import type { ImportPreview, ImportResult, LeadType } from "@/lib/types";
@@ -44,16 +46,23 @@ export default function ImportLeadsDialog({
   const [leadType, setLeadType] = useState<LeadType>("nasabah");
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [mapping, setMapping] = useState<Record<string, string | null>>({});
+  // column header -> custom column label the admin wants to keep it as ("" = keep as note).
+  const [customChoices, setCustomChoices] = useState<Record<string, string>>({});
   const [result, setResult] = useState<ImportResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
-  // Columns nobody claimed become a progress note, so the admin sees exactly what will happen.
+  // Columns nobody claimed: each can become a real custom column or fall back to a note.
   const leftovers = useMemo(() => {
     if (!preview) return [];
     const used = new Set(Object.values(mapping).filter(Boolean) as string[]);
     return preview.headers.filter((h) => !used.has(h));
   }, [preview, mapping]);
+
+  const asNotes = useMemo(
+    () => leftovers.filter((h) => !customChoices[h]),
+    [leftovers, customChoices],
+  );
 
   const missingRequired = useMemo(
     () => (preview?.fields ?? []).filter((f) => f.required && !mapping[f.key]).map((f) => f.label),
@@ -65,6 +74,7 @@ export default function ImportLeadsDialog({
     setFile(null);
     setPreview(null);
     setMapping({});
+    setCustomChoices({});
     setResult(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -92,6 +102,17 @@ export default function ImportLeadsDialog({
       setFile(picked);
       setPreview(detected);
       setMapping(detected.mapping);
+      // Default: keep every leftover column as a real column, reusing an existing label
+      // when the file repeats a column the admin already defined.
+      const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      setCustomChoices(
+        Object.fromEntries(
+          detected.unmapped_headers.map((h) => [
+            h,
+            detected.existing_custom.find((c) => norm(c.label) === norm(h))?.label ?? h,
+          ]),
+        ),
+      );
       setStep("map");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal membaca file");
@@ -109,6 +130,14 @@ export default function ImportLeadsDialog({
       body.append("file", file);
       body.append("mapping", JSON.stringify(mapping));
       body.append("lead_type", leadType);
+      body.append(
+        "custom_columns",
+        JSON.stringify(
+          leftovers
+            .filter((h) => customChoices[h]?.trim())
+            .map((h) => ({ column: h, label: customChoices[h].trim() })),
+        ),
+      );
       const res = await fetch("/api/leads/import", {
         method: "POST",
         body,
@@ -127,6 +156,7 @@ export default function ImportLeadsDialog({
       queryClient.invalidateQueries({ queryKey: ["sumber-stats"] });
       queryClient.invalidateQueries({ queryKey: ["team-performance"] });
       queryClient.invalidateQueries({ queryKey: ["deal-trend"] });
+      queryClient.invalidateQueries({ queryKey: ["custom-fields"] });
       queryClient.invalidateQueries({ queryKey: ["follow-up-notifications"] });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal mengimpor file");
@@ -269,13 +299,57 @@ export default function ImportLeadsDialog({
             </div>
 
             {leftovers.length > 0 && (
-              <p
+              <div
                 data-testid="import-leftover-columns"
-                className="rounded-lg border border-[#FDE68A] bg-[#FEF3C7] p-3 text-[13px] text-[#92400E]"
+                className="grid gap-2.5 rounded-lg border border-[#FDE68A] bg-[#FFFBEB] p-3"
               >
-                Kolom <span className="font-semibold">{leftovers.join(", ")}</span> tidak
-                dipasangkan — isinya tetap disimpan sebagai catatan di setiap lead.
-              </p>
+                <p className="text-[13px] font-semibold text-[#92400E]">
+                  Kolom sisa — jadikan kolom baru?
+                </p>
+                <p className="text-[12px] text-[#B45309]">
+                  Kolom di bawah tidak cocok dengan field bawaan. Centang untuk menyimpannya
+                  sebagai kolom permanen (nama bisa diubah); yang tidak dicentang tetap masuk
+                  sebagai catatan di tiap lead.
+                </p>
+                {leftovers.map((header) => {
+                  const active = !!customChoices[header];
+                  return (
+                    <div key={header} className="flex flex-wrap items-center gap-2">
+                      <label className="flex items-center gap-2 text-[13px] text-[#0F172A]">
+                        <Checkbox
+                          data-testid={`import-custom-toggle-${header}`}
+                          checked={active}
+                          onCheckedChange={(checked) =>
+                            setCustomChoices((c) => ({
+                              ...c,
+                              [header]: checked ? header : "",
+                            }))
+                          }
+                        />
+                        <span className="font-medium">{header}</span>
+                      </label>
+                      {active && (
+                        <>
+                          <span className="text-[12px] text-[#94A3B8]">disimpan sebagai</span>
+                          <Input
+                            data-testid={`import-custom-label-${header}`}
+                            value={customChoices[header]}
+                            onChange={(e) =>
+                              setCustomChoices((c) => ({ ...c, [header]: e.target.value }))
+                            }
+                            className="h-8 w-[200px] bg-white text-[13px]"
+                          />
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+                {asNotes.length > 0 && (
+                  <p className="text-[12px] text-[#B45309]">
+                    Masuk sebagai catatan: <span className="font-semibold">{asNotes.join(", ")}</span>
+                  </p>
+                )}
+              </div>
             )}
 
             {missingRequired.length > 0 && (

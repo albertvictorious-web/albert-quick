@@ -8,6 +8,7 @@ import RekapBulananPage from "@/pages/RekapBulananPage";
 import CatatanPage from "@/pages/CatatanPage";
 import JadwalProspek from "@/pages/JadwalProspek";
 import GantiPasswordPage from "@/pages/GantiPasswordPage";
+import CustomFieldsPage from "@/pages/CustomFieldsPage";
 import { Toaster } from "@/components/ui/sonner";
 
 // One <Route> per page in src/pages; BrowserRouter already wraps this in main.tsx.
@@ -22,6 +23,7 @@ export default function App() {
         <Route path="/jadwal-prospek" element={<JadwalProspek />} />
         <Route path="/catatan" element={<CatatanPage />} />
         <Route path="/akun-marketing" element={<MarketingAccounts />} />
+        <Route path="/kolom-custom" element={<CustomFieldsPage />} />
         <Route path="/rekap-bulanan" element={<RekapBulananPage />} />
         <Route path="/riwayat-perpindahan" element={<TransferHistory />} />
         <Route path="/ganti-password" element={<GantiPasswordPage />} />

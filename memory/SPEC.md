@@ -47,9 +47,19 @@ prospecting appointments and their personal notes.
   ("Nama Lengkap"→nama, "No HP"/"WhatsApp"→no_wa, "Umur"→usia, "Domisili"→kota, …). The dialog shows
   that guess for the admin to correct, then `POST /leads/import` takes the same file plus the
   confirmed `mapping` JSON and a `lead_type` (nasabah|pelamar) applied to every row unless the file
-  carries its own tipe column. Columns nobody mapped are appended to each lead as a ProgressNote
-  ("Data tambahan dari file import — …") so no data is lost. `GET /leads/import-template` still
-  serves the old CSV template, now optional.
+  carries its own tipe column. Columns nobody mapped are either promoted to a **custom field**
+  (checkbox + editable label in the dialog, sent as `custom_columns` JSON) or appended to each lead
+  as a ProgressNote ("Data tambahan dari file import — …") so no data is lost.
+  `GET /leads/import-template` still serves the old CSV template, now optional.
+- **Custom columns** (`custom_fields` collection: id, key, label, created_at): admin-defined extra
+  lead fields stored on `leads.custom[key]`. `GET /custom-fields` (any role), `POST` / `PATCH` /
+  `DELETE /custom-fields/{id}` (admin, max 30; delete also `$unset`s the value from every lead;
+  rename changes only the label so stored values survive). Managed at **`/kolom-custom`** (admin
+  nav) or created on the fly during import. They appear in the Tambah Leads form, the lead detail
+  sheet, and as extra columns at the end of the leads CSV export.
+- **Hapus Semua Data** (admin, `/leads` toolbar): `DELETE /leads/all?confirm=HAPUS` wipes every
+  nasabah + pelamar lead in one action and clears the lead link on personal notes. The UI requires
+  typing "HAPUS"; the backend rejects any call without the matching confirm token (400).
 - **Delete rule**: admin deletes any lead; marketing only leads where they are both
   `created_by` and `assigned_to` (i.e. self-added, not admin-given) — else 403.
 - `/jadwal-prospek`: create appointment (admin picks the marketing owner, marketing schedules for

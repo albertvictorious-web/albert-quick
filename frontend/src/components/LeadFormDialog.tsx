@@ -28,6 +28,7 @@ import {
   SUMBER_PELAMAR_OPTIONS,
   PENDIDIKAN_OPTIONS,
   TRADING_OPTIONS,
+  type CustomField,
   type Lead,
   type LeadType,
   type UploadedFile,
@@ -74,6 +75,7 @@ export default function LeadFormDialog({
   const [type, setType] = useState<LeadType>(defaultType);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [cv, setCv] = useState<UploadedFile | null>(null);
+  const [custom, setCustom] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
@@ -82,6 +84,12 @@ export default function LeadFormDialog({
     queryKey: ["assignable-marketing"],
     queryFn: () => apiGet<UserPublic[]>("/leads/assignable-marketing"),
     enabled: open && me?.role === "admin",
+  });
+
+  const { data: customFields } = useQuery<CustomField[]>({
+    queryKey: ["custom-fields"],
+    queryFn: () => apiGet<CustomField[]>("/custom-fields"),
+    enabled: open,
   });
 
   const createMutation = useMutation({
@@ -102,6 +110,10 @@ export default function LeadFormDialog({
         catatan: form.catatan || null,
         tanggal_follow_up: form.tanggal_follow_up || null,
         assigned_to: form.assigned_to || null,
+        // Only non-empty custom values are stored, so a blank box never creates a key.
+        custom: Object.fromEntries(
+          Object.entries(custom).filter(([, value]) => value.trim() !== ""),
+        ),
       }),
     onSuccess: () => {
       toast.success("Leads baru berhasil ditambahkan");
@@ -109,9 +121,11 @@ export default function LeadFormDialog({
       queryClient.invalidateQueries({ queryKey: ["leads-stats"] });
       queryClient.invalidateQueries({ queryKey: ["sumber-stats"] });
       queryClient.invalidateQueries({ queryKey: ["team-performance"] });
+      queryClient.invalidateQueries({ queryKey: ["deal-trend"] });
       queryClient.invalidateQueries({ queryKey: ["follow-up-notifications"] });
       setForm({ ...EMPTY_FORM });
       setCv(null);
+      setCustom({});
       onOpenChange(false);
     },
     onError: (err) => toast.error(errorText(err, "Gagal menambahkan leads")),
@@ -386,6 +400,27 @@ export default function LeadFormDialog({
               onChange={update("catatan")}
             />
           </div>
+
+          {customFields && customFields.length > 0 && (
+            <div className="grid gap-3 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-3">
+              <p className="text-[12px] font-semibold uppercase tracking-wide text-[#94A3B8]">
+                Kolom Custom
+              </p>
+              {customFields.map((field) => (
+                <div key={field.key} className="grid gap-1.5">
+                  <Label htmlFor={`custom-${field.key}`}>{field.label}</Label>
+                  <Input
+                    id={`custom-${field.key}`}
+                    data-testid={`lead-form-custom-input-${field.key}`}
+                    value={custom[field.key] ?? ""}
+                    onChange={(e) =>
+                      setCustom((c) => ({ ...c, [field.key]: e.target.value }))
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <DialogFooter>

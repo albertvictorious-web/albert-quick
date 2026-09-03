@@ -11,6 +11,7 @@ import {
   CalendarClock,
   KeyRound,
   ClipboardList,
+  Columns3,
   Menu,
   X,
 } from "lucide-react";
@@ -27,6 +28,7 @@ const NAV_ITEMS = [
   { to: "/catatan", label: "Catatan", icon: NotebookPen, adminOnly: false },
   { to: "/rekap-bulanan", label: "Rekap Bulanan", icon: ClipboardList, adminOnly: true },
   { to: "/akun-marketing", label: "Akun Marketing", icon: UserCog, adminOnly: true },
+  { to: "/kolom-custom", label: "Kolom Custom", icon: Columns3, adminOnly: true },
   { to: "/riwayat-perpindahan", label: "Riwayat Perpindahan", icon: History, adminOnly: true },
   { to: "/ganti-password", label: "Ganti Password", icon: KeyRound, adminOnly: false },
 ];

@@ -10,6 +10,7 @@ from lib.auth import get_current_admin, get_current_user
 from lib.db import db
 from lib.import_mapping import FIELD_KEYS, FIELD_LABELS, suggest_mapping, unmapped
 from lib.tabular import TableError, parse_table
+from models.custom_field import CustomColumnChoice, DeleteAllResult
 from models.lead import (
     AssignRequest,
     BulkAssignRequest,
@@ -32,6 +33,7 @@ from models.ops import AutoDistributeRequest, AutoDistributeResult
 from models.user import UserPublic
 from routers.targets import current_month, month_of
 from routers.transfers import log_transfers
+from routers.custom_fields import ensure_field, list_definitions
 
 router = APIRouter()
 
@@ -92,6 +94,29 @@ def _row_type(raw: str, fallback: str) -> str:
     if any(hint in value for hint in NASABAH_HINTS):
         return "nasabah"
     return fallback
+
+
+def _parse_custom_columns(raw: Optional[str], headers: List[str]) -> List[CustomColumnChoice]:
+    """Columns the admin promoted to real custom fields instead of a free-text note."""
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Daftar kolom custom tidak valid") from exc
+    if not isinstance(parsed, list):
+        raise HTTPException(status_code=400, detail="Daftar kolom custom tidak valid")
+    choices: List[CustomColumnChoice] = []
+    seen: set = set()
+    for item in parsed:
+        if not isinstance(item, dict):
+            continue
+        column = item.get("column")
+        if column not in headers or column in seen:
+            continue
+        seen.add(column)
+        choices.append(CustomColumnChoice(column=column, label=(item.get("label") or column)))
+    return choices
 
 
 @router.get("/leads/team-performance", response_model=List[TeamPerformance])
@@ -196,6 +221,7 @@ async def export_leads(
         build_leads_query(user, type, status, assigned_to, search, sumber)
     ).sort("created_at", -1).to_list(5000)
 
+    definitions = await list_definitions()
     headers = [
         "Nama",
         "Tipe",
@@ -212,7 +238,7 @@ async def export_leads(
         "Marketing",
         "Jumlah Catatan",
         "Dibuat",
-    ]
+    ] + [d["label"] for d in definitions]
 
     def cell(value: object) -> str:
         text = "" if value is None else str(value)
@@ -223,6 +249,7 @@ async def export_leads(
     lines = [",".join(cell(h) for h in headers)]
     for d in docs:
         created = d.get("created_at")
+        custom = d.get("custom") or {}
         lines.append(
             ",".join(
                 cell(v)
@@ -243,6 +270,7 @@ async def export_leads(
                     len(d.get("notes") or []),
                     created.strftime("%Y-%m-%d %H:%M") if isinstance(created, datetime) else "",
                 ]
+                + [custom.get(f["key"], "") for f in definitions]
             )
         )
 
@@ -310,6 +338,10 @@ async def import_preview(file: UploadFile = File(...), admin: dict = Depends(get
         sample_rows=[dict(zip(headers, row)) for row in rows[:5]],
         total_rows=len(rows),
         unmapped_headers=unmapped(headers, mapping),
+        existing_custom=[
+            ImportField(key=d["key"], label=d["label"], required=False)
+            for d in await list_definitions()
+        ],
     )
 
 
@@ -318,12 +350,15 @@ async def import_leads(
     file: UploadFile = File(...),
     mapping: Optional[str] = Form(None),
     lead_type: str = Form("nasabah"),
+    custom_columns: Optional[str] = Form(None),
     admin: dict = Depends(get_current_admin),
 ):
     """Bulk-create leads from any spreadsheet. Bad rows are reported, good rows still land.
 
     `mapping` is the admin-confirmed field -> column JSON from the preview step; without it the
     automatic guess is used, which keeps the old template-shaped CSV working unchanged.
+    `custom_columns` is `[{"column": "Kode Referensi", "label": "Kode Referensi"}]` — each one
+    becomes (or reuses) a custom field so the app follows the shape of the uploaded file.
     """
     if lead_type not in ("nasabah", "pelamar"):
         raise HTTPException(status_code=400, detail="Tipe leads harus 'nasabah' atau 'pelamar'")
@@ -335,7 +370,15 @@ async def import_leads(
             status_code=400,
             detail="Kolom Nama dan No. WhatsApp belum dipilih. Tentukan keduanya di layar pemetaan kolom.",
         )
-    extra_columns = unmapped(headers, column_of)
+
+    # column header -> custom field key, for the columns the admin chose to keep as columns.
+    custom_of: Dict[str, str] = {}
+    for choice in _parse_custom_columns(custom_columns, headers):
+        definition = await ensure_field(choice.label or choice.column)
+        custom_of[choice.column] = definition["key"]
+
+    claimed = {v for v in column_of.values() if v} | set(custom_of)
+    extra_columns = [h for h in headers if h not in claimed]
 
     marketing = await db.users.find({"role": "marketing"}).to_list(1000)
     by_email = {m["email"].lower(): m for m in marketing}
@@ -403,6 +446,11 @@ async def import_leads(
             created_at=now,
             updated_at=now,
             notes=notes,
+            custom={
+                key: row[column].strip()
+                for column, key in custom_of.items()
+                if (row.get(column) or "").strip()
+            },
         )
         created.append(lead.model_dump())
 
@@ -736,6 +784,28 @@ async def assign_lead(lead_id: str, body: AssignRequest, user: dict = Depends(ge
     await log_transfers([doc], target, user, "single")
     doc = await get_lead_or_404(lead_id)
     return Lead(**doc)
+
+
+@router.delete("/leads/all", response_model=DeleteAllResult)
+async def delete_all_leads(confirm: str = "", admin: dict = Depends(get_current_admin)):
+    """Wipe every nasabah and pelamar lead. Admin-only, and never by accident.
+
+    The caller must send ?confirm=HAPUS, mirroring the type-to-confirm box in the UI, so a
+    stray DELETE can never empty the database.
+    """
+    if confirm != "HAPUS":
+        raise HTTPException(
+            status_code=400,
+            detail="Konfirmasi tidak cocok. Ketik HAPUS untuk menghapus semua data leads.",
+        )
+    nasabah = await db.leads.count_documents({"type": "nasabah"})
+    pelamar = await db.leads.count_documents({"type": "pelamar"})
+    result = await db.leads.delete_many({})
+    # Personal notes may point at a lead that no longer exists — drop the dangling link.
+    await db.catatan.update_many(
+        {"lead_id": {"$ne": None}}, {"$set": {"lead_id": None, "lead_nama": None}}
+    )
+    return DeleteAllResult(deleted=result.deleted_count, nasabah=nasabah, pelamar=pelamar)
 
 
 @router.delete("/leads/{lead_id}")

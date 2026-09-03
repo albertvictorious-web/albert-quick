@@ -43,6 +43,23 @@ export interface Lead {
   created_at: string;
   updated_at: string;
   notes: ProgressNote[];
+  // Admin-defined extra columns, keyed by CustomField.key.
+  custom: Record<string, string>;
+}
+
+// Mirrors CustomField in backend/models/custom_field.py
+export interface CustomField {
+  id: string;
+  key: string;
+  label: string;
+  created_at: string;
+}
+
+// Mirrors DeleteAllResult in backend/models/custom_field.py
+export interface DeleteAllResult {
+  deleted: number;
+  nasabah: number;
+  pelamar: number;
 }
 
 // Mirrors ImportResult in backend/models/lead.py
@@ -67,6 +84,7 @@ export interface ImportPreview {
   sample_rows: Record<string, string>[];
   total_rows: number;
   unmapped_headers: string[];
+  existing_custom: ImportField[];
 }
 
 // Mirrors UploadedFile in backend/models/lead.py

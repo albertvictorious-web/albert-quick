@@ -1,0 +1,102 @@
+{
+  "iteration": 3,
+  "mode": "generate",
+  "feature": "Delete-all leads (type-to-confirm) + admin-defined custom columns (CRUD, lead form/detail, import promotion, CSV export)",
+  "passed": 12,
+  "failed": 0,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "retest_needed": false,
+  "bugs": [],
+  "action_items": [
+    "note: the leads-import auto-detector's fuzzy alias list maps the header 'Alamat Lengkap' to the built-in Kota/Domisili field (ALIASES['kota'] includes the bare word 'alamat' in backend/lib/import_mapping.py), so it is NOT left as a leftover column by default the way the acceptance criterion's example implies. Evidence: uploading 'Nama Lengkap, No. HP / WhatsApp, Kode Referensi, Alamat Lengkap' auto-mapped 'Alamat Lengkap' to Kota/Domisili in the mapping screen (screenshot in import-promotes-leftover-columns run before the workaround) instead of surfacing it under import-leftover-columns. 'Kode Referensi' behaved correctly (leftover, checked by default). The browser check manually clears that Kota mapping to still exercise the promotion pipeline end-to-end; recommend the main agent narrow the 'kota' alias so a full-address header like 'Alamat Lengkap' doesn't collide with city/domicile.",
+    "Pre-existing, unrelated backend suite failures carried over from iteration 2 (test_tscheck_rekap_bulanan, test_tscheck_notifications_exclude_closed, test_tscheck_note_closes_lead_removes_notification, test_tscheck_reschedule_clears_notification) still fail because those older tests send 'no_hp' while POST /leads now requires 'no_wa'. Not part of this iteration's criteria; flagging again for the main agent."
+  ],
+  "checks": [
+    {
+      "criterion": "Delete-all is guarded server-side and admin-only",
+      "name": "test_tscheck_delete_all_leads_guard.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "DELETE /api/leads/all (no confirm) -> 400 'Konfirmasi tidak cocok...', fixture lead survives; DELETE ...?confirm=hapus -> 400, fixture lead survives; as rina@quickpro.id ?confirm=HAPUS -> 403; with no session ?confirm=HAPUS -> 401."
+    },
+    {
+      "criterion": "Admin can wipe all leads with a type-to-confirm gate",
+      "name": "delete-all-leads-full-flow",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "As admin on /leads: delete-all-confirm-button disabled for empty box and for 'hapus', enabled only for exact 'HAPUS'; confirming closed the dialog, both Nasabah and Pelamar Kerja tabs showed 'Belum ada leads yang cocok dengan filter', and Dashboard kpi-total-leads read 0. DB re-seeded immediately after (21 leads / 3 jadwal) to restore fixtures for handoff."
+    },
+    {
+      "criterion": "Delete-all is guarded server-side and admin-only (button absent for marketing, UI)",
+      "name": "delete-all-button-absent-marketing",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Logged in as rina@quickpro.id on /leads: open-delete-all-leads-button count 0; 'Kolom Custom' nav link also count 0 (admin-only)."
+    },
+    {
+      "criterion": "Admin can create, rename and delete custom columns at /kolom-custom",
+      "name": "custom-fields-crud",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "As admin: custom-field-new-input + custom-field-add-button created 'tscheck-customfield-<ts>', row appeared as custom-field-row-<key>; rename flow updated the row's label to 'tscheck-customfield-renamed-<ts>'; delete flow removed the row (count 0)."
+    },
+    {
+      "criterion": "Admin can create, rename and delete custom columns at /kolom-custom (duplicate/empty validation, API)",
+      "name": "test_tscheck_custom_fields_validation.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /custom-fields with a label already used (same case and uppercased) -> 400 both times; POST with whitespace-only label -> 400; PATCH rename to whitespace-only label -> 400."
+    },
+    {
+      "criterion": "Custom columns appear in the Tambah Leads form and save on the lead",
+      "name": "custom-fields-lead-form-and-detail",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Created custom field 'tscheck-formfield-<ts>'; Tambah Leads dialog showed lead-form-custom-input-<key>; filled and saved a lead; its detail sheet showed lead-custom-fields containing lead-custom-value-<key> = 'custom-value-<ts>'."
+    },
+    {
+      "criterion": "Import promotes leftover columns into real custom columns",
+      "name": "test_tscheck_import_promotes_leftover_columns.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /leads/import with mapping={nama,no_wa} + custom_columns for 'Kode Referensi' and 'Alamat Lengkap' -> 200 created=1; GET /custom-fields contains both labels; the created lead's `custom` dict holds both values (REF-<ts>, address string) keyed by their fields."
+    },
+    {
+      "criterion": "Import promotes leftover columns into real custom columns (UI)",
+      "name": "import-promotes-leftover-columns",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Uploaded a CSV with headers 'Nama Lengkap, No. HP / WhatsApp, Kode Referensi, Alamat Lengkap'; import-leftover-columns showed 'Kode Referensi' checked by default with label 'Kode Referensi' (as specified). 'Alamat Lengkap' was auto-guessed onto the Kota/Domisili field by the fuzzy detector (see action_items note) -- cleared that mapping to surface it as a leftover, then confirmed both columns as custom fields. After import, GET-equivalent UI: Kolom Custom listed both labels, and the imported lead's detail sheet showed lead-custom-value-<key> for both (REF-<ts> and the address)."
+    },
+    {
+      "criterion": "Unchecking a leftover column falls back to a progress note",
+      "name": "test_tscheck_import_uncheck_leftover_progress_note.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /leads/import with custom_columns=[] for a unique leftover header -> 200 created=1; no new custom field created (label absent from GET /custom-fields); GET /leads/{id} notes[0].text starts with 'Data tambahan dari file import' and contains '<header>: <value>'; lead.custom is empty."
+    },
+    {
+      "criterion": "Unchecking a leftover column falls back to a progress note (UI)",
+      "name": "import-uncheck-leftover-falls-back-to-note",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Uploaded CSV with 'Kode Referensi' leftover; unchecked import-custom-toggle-Kode Referensi before confirming; after import, Kolom Custom shows no row for 'Kode Referensi'; imported lead's lead-notes-timeline shows 'Data tambahan dari file import ... Kode Referensi: REF-<ts>'."
+    },
+    {
+      "criterion": "Custom columns are appended to the leads CSV export",
+      "name": "test_tscheck_custom_fields_csv_export.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Created custom field, created a lead with a custom value, GET /leads/export?type=nasabah&search=<name> -> 200; CSV header's last column equals the custom field's label; the matching data row's last cell equals the stored value."
+    },
+    {
+      "criterion": "Deleting a custom column clears it everywhere without breaking leads",
+      "name": "test_tscheck_custom_field_delete_clears_everywhere.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "Created field+lead with a custom value (confirmed present via GET /leads/{id}); DELETE /custom-fields/{id} -> 200; GET /leads/{id} afterwards shows the key removed from `custom` and the lead record (nama etc.) still intact; field no longer listed in GET /custom-fields."
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Users, Download, Shuffle, Upload, MessageCircle } from "lucide-react";
+import { Plus, Search, Users, Download, Shuffle, Upload, MessageCircle, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import AppShell from "@/components/AppShell";
 import ProtectedRoute, { useMe } from "@/components/ProtectedRoute";
@@ -9,6 +9,7 @@ import LeadFormDialog from "@/components/LeadFormDialog";
 import LeadDetailSheet from "@/components/LeadDetailSheet";
 import AutoDistributeDialog from "@/components/AutoDistributeDialog";
 import ImportLeadsDialog from "@/components/ImportLeadsDialog";
+import DeleteAllLeadsDialog from "@/components/DeleteAllLeadsDialog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -45,6 +46,7 @@ function LeadsContent() {
   const [formOpen, setFormOpen] = useState(false);
   const [autoOpen, setAutoOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [deleteAllOpen, setDeleteAllOpen] = useState(false);
   const [activeLeadId, setActiveLeadId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkAssignTo, setBulkAssignTo] = useState("");
@@ -157,6 +159,17 @@ function LeadsContent() {
             >
               <Shuffle className="h-4 w-4" />
               Auto Bagi Rata
+            </Button>
+          )}
+          {isAdmin && (
+            <Button
+              variant="outline"
+              data-testid="open-delete-all-leads-button"
+              onClick={() => setDeleteAllOpen(true)}
+              className="border-[#FECDD3] text-[#BE123C] hover:bg-[#FFE4E6] hover:text-[#9F1239]"
+            >
+              <Trash2 className="h-4 w-4" />
+              Hapus Semua
             </Button>
           )}
           <Button data-testid="open-add-lead-dialog-button" onClick={() => setFormOpen(true)}>
@@ -416,6 +429,7 @@ function LeadsContent() {
       <LeadFormDialog open={formOpen} onOpenChange={setFormOpen} defaultType={type} />
       <AutoDistributeDialog open={autoOpen} onOpenChange={setAutoOpen} leadType={type} />
       <ImportLeadsDialog open={importOpen} onOpenChange={setImportOpen} />
+      <DeleteAllLeadsDialog open={deleteAllOpen} onOpenChange={setDeleteAllOpen} />
       <LeadDetailSheet leadId={activeLeadId} onOpenChange={(open) => !open && setActiveLeadId(null)} />
     </div>
   );
