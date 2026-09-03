@@ -68,18 +68,18 @@ async def main(reset: bool = False):
         ("Joko Susilo", "081234567811", 47, "Balikpapan", "Supervisor Tambang", "Ya", "Komunitas Trading", "Baru", None, None),
     ]
 
-    # nama, no_wa, usia, kota, pendidikan, status, owner, follow
+    # nama, no_wa, usia, kota, pendidikan, sumber, status, owner, follow
     pelamar = [
-        ("Andi Saputra", "082234567801", 26, "Jakarta Timur", "Sarjana", "Baru", m3, days(1)),
-        ("Citra Ayu", "082234567802", 24, "Bandung", "Diploma", "Interview", m3, days(0)),
-        ("Doni Kurniawan", "082234567803", 23, "Bekasi", "SMA", "Diterima", m3, None),
-        ("Eka Putri", "082234567804", 22, "Tangerang", "SMA", "Ditolak", m3, None),
-        ("Fajar Nugroho", "082234567805", 29, "Depok", "Sarjana", "Baru", m1, days(-1)),
-        ("Gita Permata", "082234567806", 21, "Bogor", "SMP", "Interview", m1, days(0)),
-        ("Hadi Firmansyah", "082234567807", 28, "Surabaya", "Sarjana", "Diterima", m2, None),
-        ("Indah Sari", "082234567808", 25, "Semarang", "Diploma", "Baru", m2, days(2)),
-        ("Kevin Halim", "082234567809", 24, "Medan", "SMA", "Ditolak", None, None),
-        ("Lina Marlina", "082234567810", 23, "Makassar", "Diploma", "Baru", None, None),
+        ("Andi Saputra", "082234567801", 26, "Jakarta Timur", "Sarjana", "JobStreet", "Baru", m3, days(1)),
+        ("Citra Ayu", "082234567802", 24, "Bandung", "Diploma", "LinkedIn", "Interview", m3, days(0)),
+        ("Doni Kurniawan", "082234567803", 23, "Bekasi", "SMA", "Instagram", "Diterima", m3, None),
+        ("Eka Putri", "082234567804", 22, "Tangerang", "SMA", "TikTok", "Ditolak", m3, None),
+        ("Fajar Nugroho", "082234567805", 29, "Depok", "Sarjana", "Website Karir", "Baru", m1, days(-1)),
+        ("Gita Permata", "082234567806", 21, "Bogor", "SMP", "Job Fair", "Interview", m1, days(0)),
+        ("Hadi Firmansyah", "082234567807", 28, "Surabaya", "Sarjana", "Referral Internal", "Diterima", m2, None),
+        ("Indah Sari", "082234567808", 25, "Semarang", "Diploma", "LinkedIn", "Baru", m2, days(2)),
+        ("Kevin Halim", "082234567809", 24, "Medan", "SMA", "Facebook", "Ditolak", None, None),
+        ("Lina Marlina", "082234567810", 23, "Makassar", "Diploma", "JobStreet", "Baru", None, None),
     ]
 
     docs = []
@@ -125,7 +125,7 @@ async def main(reset: bool = False):
             }
         )
 
-    for nama, no_wa, usia, kota, pendidikan, status, owner, follow in pelamar:
+    for nama, no_wa, usia, kota, pendidikan, sumber, status, owner, follow in pelamar:
         created = now_utc()
         notes = []
         if status != "Baru":
@@ -149,7 +149,7 @@ async def main(reset: bool = False):
                 "kota": kota,
                 "profesi": None,
                 "pernah_trading": None,
-                "sumber": None,
+                "sumber": sumber,
                 "pendidikan": pendidikan,
                 "cv_file_id": None,
                 "cv_filename": None,

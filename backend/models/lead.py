@@ -142,6 +142,16 @@ class SumberStat(BaseModel):
     conversion_rate: float
 
 
+class DealTrendPoint(BaseModel):
+    """One month on the deal-trend chart."""
+
+    month: str  # YYYY-MM
+    label: str  # e.g. "Sep 2026"
+    deals: int
+    nasabah: int
+    pelamar: int
+
+
 class ImportResult(BaseModel):
     created: int
     skipped: int

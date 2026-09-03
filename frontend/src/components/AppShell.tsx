@@ -10,6 +10,7 @@ import {
   NotebookPen,
   CalendarClock,
   KeyRound,
+  ClipboardList,
   Menu,
   X,
 } from "lucide-react";
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { to: "/leads", label: "Data Leads", icon: Users2, adminOnly: false },
   { to: "/jadwal-prospek", label: "Jadwal Prospek", icon: CalendarClock, adminOnly: false },
   { to: "/catatan", label: "Catatan", icon: NotebookPen, adminOnly: false },
+  { to: "/rekap-bulanan", label: "Rekap Bulanan", icon: ClipboardList, adminOnly: true },
   { to: "/akun-marketing", label: "Akun Marketing", icon: UserCog, adminOnly: true },
   { to: "/riwayat-perpindahan", label: "Riwayat Perpindahan", icon: History, adminOnly: true },
   { to: "/ganti-password", label: "Ganti Password", icon: KeyRound, adminOnly: false },

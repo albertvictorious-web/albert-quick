@@ -17,6 +17,7 @@ from models.lead import (
     LeadCreate,
     LeadStats,
     LeadUpdate,
+    DealTrendPoint,
     NoteCreate,
     ProgressNote,
     SumberStat,
@@ -369,12 +370,13 @@ async def assignable_marketing(user: dict = Depends(get_current_user)):
 
 
 @router.get("/leads/sumber-stats", response_model=List[SumberStat])
-async def sumber_stats(user: dict = Depends(get_current_user)):
+async def sumber_stats(type: str = "nasabah", user: dict = Depends(get_current_user)):
     """Deal performance per acquisition channel, sorted by most deals won.
 
-    Nasabah only — 'sumber' is the "dari mana mengetahui QuickPro" answer. Role-scoped.
+    Works for both lead types: nasabah = how they heard about QuickPro, pelamar = where they
+    found the job opening. Role-scoped.
     """
-    query: dict = {"type": "nasabah"}
+    query: dict = {"type": type if type in ("nasabah", "pelamar") else "nasabah"}
     if user["role"] == "marketing":
         query["assigned_to"] = user["id"]
     docs = await db.leads.find(query).to_list(5000)
@@ -402,6 +404,50 @@ async def sumber_stats(user: dict = Depends(get_current_user)):
     ]
     stats.sort(key=lambda s: (s.won, s.total), reverse=True)
     return stats
+
+
+@router.get("/leads/deal-trend", response_model=List[DealTrendPoint])
+async def deal_trend(months: int = 6, user: dict = Depends(get_current_user)):
+    """Won leads per month for the last N months (default 6), role-scoped.
+
+    A win is dated by closed_at, falling back to updated_at for rows created before that
+    field existed.
+    """
+    span = max(1, min(months, 24))
+    query: dict = {"status": {"$in": list(WON_STATUSES)}}
+    if user["role"] == "marketing":
+        query["assigned_to"] = user["id"]
+    docs = await db.leads.find(query).to_list(5000)
+
+    now = datetime.now(timezone.utc)
+    buckets: list = []
+    for offset in range(span - 1, -1, -1):
+        year = now.year
+        month = now.month - offset
+        while month <= 0:
+            month += 12
+            year -= 1
+        key = f"{year:04d}-{month:02d}"
+        buckets.append({"month": key, "nasabah": 0, "pelamar": 0})
+    index = {b["month"]: b for b in buckets}
+
+    for d in docs:
+        key = month_of(d)
+        bucket = index.get(key or "")
+        if bucket:
+            bucket["nasabah" if d["type"] == "nasabah" else "pelamar"] += 1
+
+    names = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
+    return [
+        DealTrendPoint(
+            month=b["month"],
+            label=f"{names[int(b['month'][5:]) - 1]} {b['month'][:4]}",
+            deals=b["nasabah"] + b["pelamar"],
+            nasabah=b["nasabah"],
+            pelamar=b["pelamar"],
+        )
+        for b in buckets
+    ]
 
 
 @router.get("/leads/notifications", response_model=List[FollowUpNotification])

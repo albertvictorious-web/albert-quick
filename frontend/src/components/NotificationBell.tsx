@@ -78,7 +78,9 @@ export default function NotificationBell({
       toast.info(`Jadwal prospek: ${j.client_nama}`, {
         description: j.overdue
           ? `Terlewat (${j.tanggal} ${j.jam}) — belum ada hasil pertemuan`
-          : `Hari ini pukul ${j.jam} di ${j.lokasi}`,
+          : j.soon
+            ? `Mulai ${j.minutes_until} menit lagi (${j.jam}) di ${j.lokasi}`
+            : `Hari ini pukul ${j.jam} di ${j.lokasi}`,
       });
     }
   }, [jadwalData, jadwalError]);
@@ -134,10 +136,15 @@ export default function NotificationBell({
                   <span className="text-sm font-semibold text-[#0F172A]">{j.client_nama}</span>
                   <span
                     className={`text-[11px] font-semibold ${
-                      j.overdue ? "text-[#B45309]" : "text-[#0F766E]"
+                      j.overdue ? "text-[#B45309]" : j.soon ? "text-[#BE123C]" : "text-[#0F766E]"
                     }`}
                   >
-                    {j.overdue ? "Terlewat" : "Hari ini"} · {j.jam}
+                    {j.overdue
+                      ? "Terlewat"
+                      : j.soon
+                        ? `${j.minutes_until} menit lagi`
+                        : "Hari ini"}{" "}
+                    · {j.jam}
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[#475569]">

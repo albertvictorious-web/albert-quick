@@ -25,6 +25,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiGet, apiPost, ApiError } from "@/lib/api";
 import {
   SUMBER_OPTIONS,
+  SUMBER_PELAMAR_OPTIONS,
   PENDIDIKAN_OPTIONS,
   TRADING_OPTIONS,
   type Lead,
@@ -93,7 +94,7 @@ export default function LeadFormDialog({
         kota: form.kota || null,
         profesi: type === "nasabah" ? form.profesi || null : null,
         pernah_trading: type === "nasabah" ? form.pernah_trading || null : null,
-        sumber: type === "nasabah" ? form.sumber || null : null,
+        sumber: form.sumber || null,
         pendidikan: type === "pelamar" ? form.pendidikan || null : null,
         cv_file_id: type === "pelamar" ? cv?.file_id ?? null : null,
         cv_filename: type === "pelamar" ? cv?.filename ?? null : null,
@@ -145,7 +146,7 @@ export default function LeadFormDialog({
   const canSubmit =
     !!form.nama &&
     !!form.no_wa &&
-    (type === "pelamar" || !!form.sumber) &&
+    !!form.sumber &&
     !createMutation.isPending &&
     !uploading;
 
@@ -159,7 +160,13 @@ export default function LeadFormDialog({
           <DialogTitle>Tambah Leads Baru</DialogTitle>
         </DialogHeader>
 
-        <Tabs value={type} onValueChange={(v) => setType(v as LeadType)}>
+        <Tabs
+          value={type}
+          onValueChange={(v) => {
+            setType(v as LeadType);
+            setForm((f) => ({ ...f, sumber: "" }));
+          }}
+        >
           <TabsList>
             <TabsTrigger value="nasabah" data-testid="lead-form-tab-nasabah">
               Nasabah
@@ -276,6 +283,24 @@ export default function LeadFormDialog({
                     {PENDIDIKAN_OPTIONS.map((p) => (
                       <SelectItem key={p} value={p}>
                         {p}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-1.5">
+                <Label>Dari Mana Tahu Lowongan?</Label>
+                <Select
+                  value={form.sumber}
+                  onValueChange={(v) => setForm((f) => ({ ...f, sumber: v }))}
+                >
+                  <SelectTrigger data-testid="lead-form-select-sumber-pelamar">
+                    <SelectValue>{(v) => (v as string) || "Pilih sumber lowongan"}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SUMBER_PELAMAR_OPTIONS.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
                       </SelectItem>
                     ))}
                   </SelectContent>

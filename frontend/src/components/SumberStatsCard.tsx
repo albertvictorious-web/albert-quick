@@ -1,13 +1,17 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Radio, Trophy } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiGet } from "@/lib/api";
-import type { SumberStat } from "@/lib/types";
+import type { LeadType, SumberStat } from "@/lib/types";
 
 /** Which acquisition channel actually converts into deals. */
 export default function SumberStatsCard() {
+  const [type, setType] = useState<LeadType>("nasabah");
+
   const { data, error, isLoading } = useQuery<SumberStat[]>({
-    queryKey: ["sumber-stats"],
-    queryFn: () => apiGet<SumberStat[]>("/leads/sumber-stats"),
+    queryKey: ["sumber-stats", type],
+    queryFn: () => apiGet<SumberStat[]>(`/leads/sumber-stats?type=${type}`),
   });
 
   const rows = error ? [] : (data ?? []);
@@ -27,7 +31,9 @@ export default function SumberStatsCard() {
               Performa Sumber Leads
             </p>
             <p className="text-xs text-[#94A3B8]">
-              Channel mana yang paling banyak menghasilkan deal (khusus nasabah)
+              {type === "nasabah"
+                ? "Channel mana yang paling banyak menghasilkan deal nasabah"
+                : "Channel rekrutmen mana yang paling banyak menghasilkan pelamar diterima"}
             </p>
           </div>
         </div>
@@ -38,11 +44,22 @@ export default function SumberStatsCard() {
           >
             <Trophy className="h-3.5 w-3.5 text-[#065F46]" />
             <span className="text-xs font-semibold text-[#065F46]">
-              Terbaik: {best.sumber} ({best.won} deal)
+              Terbaik: {best.sumber} ({best.won} {type === "nasabah" ? "deal" : "diterima"})
             </span>
           </div>
         )}
       </div>
+
+      <Tabs value={type} onValueChange={(v) => setType(v as LeadType)} className="mb-4">
+        <TabsList>
+          <TabsTrigger value="nasabah" data-testid="sumber-stats-tab-nasabah">
+            Nasabah
+          </TabsTrigger>
+          <TabsTrigger value="pelamar" data-testid="sumber-stats-tab-pelamar">
+            Pelamar Kerja
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       {isLoading && <p className="text-sm text-[#94A3B8]">Memuat performa sumber...</p>}
       {!isLoading && rows.length === 0 && (

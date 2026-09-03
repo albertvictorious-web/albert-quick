@@ -127,6 +127,8 @@ class JadwalReminder(BaseModel):
     jam: str
     kendaraan: str
     overdue: bool
+    soon: bool = False          # starts within the next hour
+    minutes_until: int = 0      # negative once the start time has passed
 
 
 class RekapProspek(BaseModel):

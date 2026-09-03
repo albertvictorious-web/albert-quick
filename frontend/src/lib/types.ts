@@ -101,6 +101,48 @@ export interface JadwalReminder {
   jam: string;
   kendaraan: string;
   overdue: boolean;
+  soon: boolean;
+  minutes_until: number;
+}
+
+// Mirrors DealTrendPoint in backend/models/lead.py
+export interface DealTrendPoint {
+  month: string;
+  label: string;
+  deals: number;
+  nasabah: number;
+  pelamar: number;
+}
+
+// Mirrors RekapMarketing / RekapSumber / RekapBulanan in backend/routers/rekap.py
+export interface RekapMarketing {
+  marketing_id: string;
+  marketing_name: string;
+  deals: number;
+  leads_masuk: number;
+  jadwal: number;
+  jadwal_selesai: number;
+  target_deals: number;
+  target_progress: number;
+}
+
+export interface RekapSumber {
+  sumber: string;
+  type: string;
+  total: number;
+  won: number;
+  conversion_rate: number;
+}
+
+export interface RekapBulanan {
+  month: string;
+  label: string;
+  total_leads_masuk: number;
+  total_deals: number;
+  total_jadwal: number;
+  total_jadwal_selesai: number;
+  per_marketing: RekapMarketing[];
+  per_sumber: RekapSumber[];
 }
 
 // Mirrors RekapProspek in backend/models/ops.py
@@ -135,6 +177,18 @@ export const SUMBER_OPTIONS = [
   "Komunitas Trading",
   "Iklan/Ads",
   "Referral IB/Partner",
+];
+
+export const SUMBER_PELAMAR_OPTIONS = [
+  "JobStreet",
+  "LinkedIn",
+  "Instagram",
+  "TikTok",
+  "Facebook",
+  "Website Karir",
+  "Teman/Keluarga",
+  "Job Fair",
+  "Referral Internal",
 ];
 
 export const PENDIDIKAN_OPTIONS = ["SMP", "SMA", "Diploma", "Sarjana"];

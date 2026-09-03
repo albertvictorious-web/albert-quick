@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { FileText, Trash2 } from "lucide-react";
+import { FileText, Trash2, MessageCircle } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import StatusBadge from "@/components/StatusBadge";
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
+import { waLink } from "@/lib/wa";
 import {
   NASABAH_STATUSES,
   PELAMAR_STATUSES,
@@ -170,12 +171,29 @@ export default function LeadDetailSheet({
           </div>
 
           <div className="grid grid-cols-2 gap-4 rounded-xl border border-[#E2E8F0] bg-white p-4">
-            <InfoRow label="No. WhatsApp" value={lead.no_wa} />
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[11px] uppercase tracking-wide text-[#94A3B8]">
+                No. WhatsApp
+              </span>
+              <a
+                href={waLink(lead.no_wa)}
+                target="_blank"
+                rel="noreferrer"
+                data-testid="lead-detail-wa-link"
+                className="flex w-fit items-center gap-1.5 text-sm font-medium text-[#0F766E] transition-colors duration-200 hover:underline"
+              >
+                <MessageCircle className="h-3.5 w-3.5" />
+                {lead.no_wa}
+              </a>
+            </div>
             <InfoRow label="Usia" value={lead.usia ? `${lead.usia} tahun` : null} />
             <InfoRow label="Kota Domisili" value={lead.kota} />
             <InfoRow label="Profesi / Pekerjaan" value={lead.profesi} />
             <InfoRow label="Pernah Trading" value={lead.pernah_trading} />
-            <InfoRow label="Sumber (Tahu QuickPro)" value={lead.sumber} />
+            <InfoRow
+              label={lead.type === "nasabah" ? "Sumber (Tahu QuickPro)" : "Sumber Lowongan"}
+              value={lead.sumber}
+            />
             <InfoRow label="Pendidikan Terakhir" value={lead.pendidikan} />
             <InfoRow label="Follow Up" value={lead.tanggal_follow_up} />
             <InfoRow label="Ditugaskan ke" value={lead.assigned_to_name ?? "Belum ditugaskan"} />

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Users, Download, Shuffle, Upload } from "lucide-react";
+import { Plus, Search, Users, Download, Shuffle, Upload, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import AppShell from "@/components/AppShell";
 import ProtectedRoute, { useMe } from "@/components/ProtectedRoute";
@@ -22,10 +22,12 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { apiGet, apiPost, ApiError } from "@/lib/api";
+import { waLink } from "@/lib/wa";
 import {
   NASABAH_STATUSES,
   PELAMAR_STATUSES,
   SUMBER_OPTIONS,
+  SUMBER_PELAMAR_OPTIONS,
   type BulkAssignResult,
   type Lead,
   type LeadType,
@@ -61,7 +63,7 @@ function LeadsContent() {
       params.set("type", type);
       if (status !== "all") params.set("status", status);
       if (assignedTo !== "all" && isAdmin) params.set("assigned_to", assignedTo);
-      if (sumber !== "all" && type === "nasabah") params.set("sumber", sumber);
+      if (sumber !== "all") params.set("sumber", sumber);
       if (search) params.set("search", search);
       return apiGet<Lead[]>(`/leads?${params.toString()}`);
     },
@@ -106,7 +108,7 @@ function LeadsContent() {
   exportParams.set("type", type);
   if (status !== "all") exportParams.set("status", status);
   if (assignedTo !== "all" && isAdmin) exportParams.set("assigned_to", assignedTo);
-  if (sumber !== "all" && type === "nasabah") exportParams.set("sumber", sumber);
+  if (sumber !== "all") exportParams.set("sumber", sumber);
   if (search) exportParams.set("search", search);
   const exportHref = `/api/leads/export?${exportParams.toString()}`;
 
@@ -216,8 +218,7 @@ function LeadsContent() {
             ))}
           </SelectContent>
         </Select>
-        {type === "nasabah" && (
-          <Select
+        <Select
             value={sumber}
             onValueChange={(v) => {
               setSumber(v);
@@ -229,14 +230,13 @@ function LeadsContent() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Semua Sumber</SelectItem>
-              {SUMBER_OPTIONS.map((s) => (
+              {(type === "nasabah" ? SUMBER_OPTIONS : SUMBER_PELAMAR_OPTIONS).map((s) => (
                 <SelectItem key={s} value={s}>
                   {s}
                 </SelectItem>
               ))}
             </SelectContent>
-          </Select>
-        )}
+        </Select>
         {isAdmin && (
           <Select
             value={assignedTo}
@@ -372,7 +372,18 @@ function LeadsContent() {
                     </TableCell>
                   )}
                   <TableCell className="font-medium text-[#0F172A]">{lead.nama}</TableCell>
-                  <TableCell className="text-[#475569]">{lead.no_wa}</TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <a
+                      href={waLink(lead.no_wa)}
+                      target="_blank"
+                      rel="noreferrer"
+                      data-testid={`wa-link-${lead.id}`}
+                      className="inline-flex items-center gap-1.5 font-medium text-[#0F766E] transition-colors duration-200 hover:text-[#0d6058] hover:underline"
+                    >
+                      <MessageCircle className="h-3.5 w-3.5" />
+                      {lead.no_wa}
+                    </a>
+                  </TableCell>
                   <TableCell className="text-[#475569]">
                     {[lead.usia ? `${lead.usia} th` : null, lead.kota].filter(Boolean).join(" · ") ||
                       "-"}

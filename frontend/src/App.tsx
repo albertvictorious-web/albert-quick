@@ -4,6 +4,7 @@ import Dashboard from "@/pages/Dashboard";
 import Leads from "@/pages/Leads";
 import MarketingAccounts from "@/pages/MarketingAccounts";
 import TransferHistory from "@/pages/TransferHistory";
+import RekapBulananPage from "@/pages/RekapBulananPage";
 import CatatanPage from "@/pages/CatatanPage";
 import JadwalProspek from "@/pages/JadwalProspek";
 import GantiPasswordPage from "@/pages/GantiPasswordPage";
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="/jadwal-prospek" element={<JadwalProspek />} />
         <Route path="/catatan" element={<CatatanPage />} />
         <Route path="/akun-marketing" element={<MarketingAccounts />} />
+        <Route path="/rekap-bulanan" element={<RekapBulananPage />} />
         <Route path="/riwayat-perpindahan" element={<TransferHistory />} />
         <Route path="/ganti-password" element={<GantiPasswordPage />} />
       </Routes>

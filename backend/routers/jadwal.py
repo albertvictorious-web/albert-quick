@@ -1,6 +1,6 @@
 """Prospecting schedules. Marketing manages their own; admin sees and manages the whole team."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -21,9 +21,18 @@ KENDARAAN_OPTIONS = [
 STATUS_OPTIONS = ["Terjadwal", "Selesai", "Dibatalkan"]
 
 
+# Appointment times are entered in local Indonesian time (WIB = UTC+7), so the reminder
+# window is computed against a WIB "now" rather than raw UTC.
+WIB = timedelta(hours=7)
+
+
+def now_wib() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None) + WIB
+
+
 def today_iso() -> str:
-    """Server-anchored today so a client clock can't shift the reminder window."""
-    return datetime.now(timezone.utc).date().isoformat()
+    """Server-anchored today (WIB) so a client clock can't shift the reminder window."""
+    return now_wib().date().isoformat()
 
 
 def check_owner(doc: dict, user: dict):
@@ -38,23 +47,38 @@ async def jadwal_reminders(user: dict = Depends(get_current_user)):
     Role-scoped like /jadwal: marketing only ever sees their own agenda.
     """
     today = today_iso()
-    query: dict = {"status": "Terjadwal", "tanggal": {"$lte": today}}
+    tomorrow = (now_wib() + timedelta(days=1)).date().isoformat()
+    # Today (and anything overdue) plus tomorrow, so a 23:30 appointment still gets its
+    # one-hour-ahead nudge at 22:30 today. Tomorrow's rows are filtered to the <=60min window.
+    query: dict = {"status": "Terjadwal", "tanggal": {"$lte": tomorrow}}
     if user["role"] == "marketing":
         query["marketing_id"] = user["id"]
     docs = await db.jadwal.find(query).sort([("tanggal", 1), ("jam", 1)]).to_list(200)
-    return [
-        JadwalReminder(
-            id=d["id"],
-            client_nama=d["client_nama"],
-            marketing_name=d["marketing_name"],
-            lokasi=d["lokasi"],
-            tanggal=d["tanggal"],
-            jam=d["jam"],
-            kendaraan=d["kendaraan"],
-            overdue=d["tanggal"] < today,
+
+    now = now_wib()
+    out: list = []
+    for d in docs:
+        try:
+            starts = datetime.strptime(f"{d['tanggal']} {d['jam']}", "%Y-%m-%d %H:%M")
+            minutes = int((starts - now).total_seconds() // 60)
+        except ValueError:
+            minutes = 0
+        out.append(
+            JadwalReminder(
+                id=d["id"],
+                client_nama=d["client_nama"],
+                marketing_name=d["marketing_name"],
+                lokasi=d["lokasi"],
+                tanggal=d["tanggal"],
+                jam=d["jam"],
+                kendaraan=d["kendaraan"],
+                overdue=d["tanggal"] < today,
+                soon=0 <= minutes <= 60,
+                minutes_until=minutes,
+            )
         )
-        for d in docs
-    ]
+    today_str = today
+    return [r for r in out if r.tanggal <= today_str or r.soon]
 
 
 @router.get("/jadwal/rekap", response_model=List[RekapProspek])
