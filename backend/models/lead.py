@@ -131,6 +131,17 @@ class TeamPerformance(BaseModel):
     target_progress: float = 0.0
 
 
+class SumberStat(BaseModel):
+    """Per-channel performance: which source produces the most deals."""
+
+    sumber: str
+    total: int
+    won: int
+    lost: int
+    open: int
+    conversion_rate: float
+
+
 class ImportResult(BaseModel):
     created: int
     skipped: int

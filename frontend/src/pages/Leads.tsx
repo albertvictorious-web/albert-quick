@@ -25,6 +25,7 @@ import { apiGet, apiPost, ApiError } from "@/lib/api";
 import {
   NASABAH_STATUSES,
   PELAMAR_STATUSES,
+  SUMBER_OPTIONS,
   type BulkAssignResult,
   type Lead,
   type LeadType,
@@ -36,6 +37,7 @@ function LeadsContent() {
   const isAdmin = me?.role === "admin";
   const [type, setType] = useState<LeadType>("nasabah");
   const [status, setStatus] = useState("all");
+  const [sumber, setSumber] = useState("all");
   const [assignedTo, setAssignedTo] = useState("all");
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -53,12 +55,13 @@ function LeadsContent() {
   });
 
   const { data: leads, isLoading, error } = useQuery<Lead[]>({
-    queryKey: ["leads", type, status, assignedTo, search],
+    queryKey: ["leads", type, status, assignedTo, search, sumber],
     queryFn: () => {
       const params = new URLSearchParams();
       params.set("type", type);
       if (status !== "all") params.set("status", status);
       if (assignedTo !== "all" && isAdmin) params.set("assigned_to", assignedTo);
+      if (sumber !== "all" && type === "nasabah") params.set("sumber", sumber);
       if (search) params.set("search", search);
       return apiGet<Lead[]>(`/leads?${params.toString()}`);
     },
@@ -76,6 +79,7 @@ function LeadsContent() {
       setBulkAssignTo("");
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       queryClient.invalidateQueries({ queryKey: ["leads-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["sumber-stats"] });
       queryClient.invalidateQueries({ queryKey: ["team-performance"] });
       queryClient.invalidateQueries({ queryKey: ["follow-up-notifications"] });
     },
@@ -102,6 +106,7 @@ function LeadsContent() {
   exportParams.set("type", type);
   if (status !== "all") exportParams.set("status", status);
   if (assignedTo !== "all" && isAdmin) exportParams.set("assigned_to", assignedTo);
+  if (sumber !== "all" && type === "nasabah") exportParams.set("sumber", sumber);
   if (search) exportParams.set("search", search);
   const exportHref = `/api/leads/export?${exportParams.toString()}`;
 
@@ -164,6 +169,7 @@ function LeadsContent() {
         onValueChange={(v) => {
           setType(v as LeadType);
           setStatus("all");
+          setSumber("all");
           resetSelection();
         }}
       >
@@ -210,6 +216,27 @@ function LeadsContent() {
             ))}
           </SelectContent>
         </Select>
+        {type === "nasabah" && (
+          <Select
+            value={sumber}
+            onValueChange={(v) => {
+              setSumber(v);
+              resetSelection();
+            }}
+          >
+            <SelectTrigger data-testid="leads-filter-sumber" className="w-[190px]">
+              <SelectValue>{(v) => (v === "all" ? "Semua Sumber" : (v as string))}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Sumber</SelectItem>
+              {SUMBER_OPTIONS.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         {isAdmin && (
           <Select
             value={assignedTo}

@@ -56,6 +56,7 @@ export default function AutoDistributeDialog({
       setPicked([]);
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       queryClient.invalidateQueries({ queryKey: ["leads-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["sumber-stats"] });
       queryClient.invalidateQueries({ queryKey: ["team-performance"] });
       queryClient.invalidateQueries({ queryKey: ["transfers"] });
       queryClient.invalidateQueries({ queryKey: ["follow-up-notifications"] });

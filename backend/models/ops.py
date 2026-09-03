@@ -114,3 +114,29 @@ class JadwalUpdate(BaseModel):
     kendaraan: Optional[str] = None
     status: Optional[str] = None
     hasil_pertemuan: Optional[str] = None
+
+
+class JadwalReminder(BaseModel):
+    """A still-open appointment whose date has arrived (or passed)."""
+
+    id: str
+    client_nama: str
+    marketing_name: str
+    lokasi: str
+    tanggal: str
+    jam: str
+    kendaraan: str
+    overdue: bool
+
+
+class RekapProspek(BaseModel):
+    """Per-marketing appointment recap for one month."""
+
+    marketing_id: str
+    marketing_name: str
+    month: str
+    total: int
+    terjadwal: int
+    selesai: int
+    dibatalkan: int
+    ada_hasil: int

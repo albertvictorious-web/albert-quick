@@ -82,6 +82,7 @@ export default function LeadDetailSheet({
       queryClient.invalidateQueries({ queryKey: ["lead", leadId] });
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       queryClient.invalidateQueries({ queryKey: ["leads-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["sumber-stats"] });
       queryClient.invalidateQueries({ queryKey: ["follow-up-notifications"] });
     },
     onError: () => toast.error("Gagal menambahkan catatan"),
@@ -95,6 +96,7 @@ export default function LeadDetailSheet({
       queryClient.invalidateQueries({ queryKey: ["lead", leadId] });
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       queryClient.invalidateQueries({ queryKey: ["leads-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["sumber-stats"] });
       queryClient.invalidateQueries({ queryKey: ["follow-up-notifications"] });
     },
     onError: () => toast.error("Gagal memindahkan leads"),
@@ -108,6 +110,7 @@ export default function LeadDetailSheet({
       queryClient.invalidateQueries({ queryKey: ["lead", leadId] });
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       queryClient.invalidateQueries({ queryKey: ["leads-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["sumber-stats"] });
       queryClient.invalidateQueries({ queryKey: ["follow-up-notifications"] });
     },
     onError: () => toast.error("Gagal memperbarui jadwal follow up"),
@@ -119,6 +122,7 @@ export default function LeadDetailSheet({
       toast.success("Leads dihapus");
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       queryClient.invalidateQueries({ queryKey: ["leads-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["sumber-stats"] });
       queryClient.invalidateQueries({ queryKey: ["team-performance"] });
       queryClient.invalidateQueries({ queryKey: ["follow-up-notifications"] });
       onOpenChange(false);

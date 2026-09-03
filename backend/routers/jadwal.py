@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from lib.auth import get_current_user
 from lib.db import db
-from models.ops import Jadwal, JadwalCreate, JadwalUpdate
+from models.ops import Jadwal, JadwalCreate, JadwalReminder, JadwalUpdate, RekapProspek
 
 router = APIRouter()
 
@@ -21,9 +21,69 @@ KENDARAAN_OPTIONS = [
 STATUS_OPTIONS = ["Terjadwal", "Selesai", "Dibatalkan"]
 
 
+def today_iso() -> str:
+    """Server-anchored today so a client clock can't shift the reminder window."""
+    return datetime.now(timezone.utc).date().isoformat()
+
+
 def check_owner(doc: dict, user: dict):
     if user["role"] != "admin" and doc["marketing_id"] != user["id"]:
         raise HTTPException(status_code=403, detail="Anda tidak memiliki akses ke jadwal ini")
+
+
+@router.get("/jadwal/reminders", response_model=List[JadwalReminder])
+async def jadwal_reminders(user: dict = Depends(get_current_user)):
+    """Appointments still marked Terjadwal whose date is today or already past.
+
+    Role-scoped like /jadwal: marketing only ever sees their own agenda.
+    """
+    today = today_iso()
+    query: dict = {"status": "Terjadwal", "tanggal": {"$lte": today}}
+    if user["role"] == "marketing":
+        query["marketing_id"] = user["id"]
+    docs = await db.jadwal.find(query).sort([("tanggal", 1), ("jam", 1)]).to_list(200)
+    return [
+        JadwalReminder(
+            id=d["id"],
+            client_nama=d["client_nama"],
+            marketing_name=d["marketing_name"],
+            lokasi=d["lokasi"],
+            tanggal=d["tanggal"],
+            jam=d["jam"],
+            kendaraan=d["kendaraan"],
+            overdue=d["tanggal"] < today,
+        )
+        for d in docs
+    ]
+
+
+@router.get("/jadwal/rekap", response_model=List[RekapProspek])
+async def jadwal_rekap(month: Optional[str] = None, user: dict = Depends(get_current_user)):
+    """Monthly appointment recap. Admin gets every marketing user, marketing gets only itself."""
+    m = month or datetime.now(timezone.utc).strftime("%Y-%m")
+    if user["role"] == "admin":
+        people = await db.users.find({"role": "marketing"}).sort("name", 1).to_list(1000)
+    else:
+        people = [user]
+
+    result: list = []
+    for person in people:
+        docs = await db.jadwal.find(
+            {"marketing_id": person["id"], "tanggal": {"$regex": f"^{m}"}}
+        ).to_list(2000)
+        result.append(
+            RekapProspek(
+                marketing_id=person["id"],
+                marketing_name=person["name"],
+                month=m,
+                total=len(docs),
+                terjadwal=sum(1 for d in docs if d["status"] == "Terjadwal"),
+                selesai=sum(1 for d in docs if d["status"] == "Selesai"),
+                dibatalkan=sum(1 for d in docs if d["status"] == "Dibatalkan"),
+                ada_hasil=sum(1 for d in docs if (d.get("hasil_pertemuan") or "").strip()),
+            )
+        )
+    return result
 
 
 @router.get("/jadwal", response_model=List[Jadwal])

@@ -45,7 +45,18 @@ prospecting appointments and their personal notes.
   `created_by` and `assigned_to` (i.e. self-added, not admin-given) — else 403.
 - `/jadwal-prospek`: create appointment (admin picks the marketing owner, marketing schedules for
   self), fill `hasil_pertemuan` after the meeting → status auto-flips to Selesai. Marketing sees
-  own only; admin sees the whole team.
+  own only; admin sees the whole team. Page also carries the **Rekap Prospek** panel with a month
+  picker (`GET /jadwal/rekap?month=YYYY-MM`): per-marketing total / terjadwal / selesai /
+  dibatalkan / hasil-terisi — admin sees every marketing user, marketing only itself.
+- **Notification bell** (topbar, every page, 20s poll) has two sections:
+  *Jadwal Prospek* from `GET /jadwal/reminders` — appointments still `Terjadwal` whose date is
+  today or past (`overdue` flag); reporting the outcome removes them. Clicking one goes to
+  `/jadwal-prospek`. *Follow Up Leads* from `GET /leads/notifications`; clicking one opens the lead
+  sheet. Newly appearing items also raise a toast. Both endpoints are role-scoped.
+- **Performa Sumber Leads** (dashboard, both roles, role-scoped): `GET /leads/sumber-stats` returns
+  per-channel total / won / lost / open / conversion for nasabah, sorted by deals won, with a
+  "Terbaik" chip. `/leads` has a matching **Sumber** filter (nasabah tab only; hidden on Pelamar)
+  that also flows into the CSV export.
 - `/catatan`: personal notes, optional lead link (only a lead the author may see). Admin views all
   but cannot edit/delete another user's note (403).
 - `/akun-marketing` (admin): create/edit/delete accounts + monthly target panel.

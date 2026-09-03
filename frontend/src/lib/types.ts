@@ -91,6 +91,40 @@ export interface Jadwal {
   updated_at: string;
 }
 
+// Mirrors JadwalReminder in backend/models/ops.py
+export interface JadwalReminder {
+  id: string;
+  client_nama: string;
+  marketing_name: string;
+  lokasi: string;
+  tanggal: string;
+  jam: string;
+  kendaraan: string;
+  overdue: boolean;
+}
+
+// Mirrors RekapProspek in backend/models/ops.py
+export interface RekapProspek {
+  marketing_id: string;
+  marketing_name: string;
+  month: string;
+  total: number;
+  terjadwal: number;
+  selesai: number;
+  dibatalkan: number;
+  ada_hasil: number;
+}
+
+// Mirrors SumberStat in backend/models/lead.py
+export interface SumberStat {
+  sumber: string;
+  total: number;
+  won: number;
+  lost: number;
+  open: number;
+  conversion_rate: number;
+}
+
 export const SUMBER_OPTIONS = [
   "Instagram",
   "Facebook",

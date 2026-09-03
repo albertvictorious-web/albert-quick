@@ -19,6 +19,7 @@ from models.lead import (
     LeadUpdate,
     NoteCreate,
     ProgressNote,
+    SumberStat,
     TeamPerformance,
 )
 from models.ops import AutoDistributeRequest, AutoDistributeResult
@@ -144,12 +145,13 @@ async def export_leads(
     status: Optional[str] = None,
     assigned_to: Optional[str] = None,
     search: Optional[str] = None,
+    sumber: Optional[str] = None,
     user: dict = Depends(get_current_user),
 ):
     """CSV export of the current filter selection. Role-scoped exactly like GET /leads."""
-    docs = await db.leads.find(build_leads_query(user, type, status, assigned_to, search)).sort(
-        "created_at", -1
-    ).to_list(5000)
+    docs = await db.leads.find(
+        build_leads_query(user, type, status, assigned_to, search, sumber)
+    ).sort("created_at", -1).to_list(5000)
 
     headers = [
         "Nama",
@@ -366,6 +368,42 @@ async def assignable_marketing(user: dict = Depends(get_current_user)):
     return [UserPublic(**u) for u in users]
 
 
+@router.get("/leads/sumber-stats", response_model=List[SumberStat])
+async def sumber_stats(user: dict = Depends(get_current_user)):
+    """Deal performance per acquisition channel, sorted by most deals won.
+
+    Nasabah only — 'sumber' is the "dari mana mengetahui QuickPro" answer. Role-scoped.
+    """
+    query: dict = {"type": "nasabah"}
+    if user["role"] == "marketing":
+        query["assigned_to"] = user["id"]
+    docs = await db.leads.find(query).to_list(5000)
+
+    buckets: dict = {}
+    for d in docs:
+        key = d.get("sumber") or "Tidak Diketahui"
+        row = buckets.setdefault(key, {"total": 0, "won": 0, "lost": 0})
+        row["total"] += 1
+        if d["status"] in WON_STATUSES:
+            row["won"] += 1
+        elif d["status"] in LOST_STATUSES:
+            row["lost"] += 1
+
+    stats = [
+        SumberStat(
+            sumber=key,
+            total=v["total"],
+            won=v["won"],
+            lost=v["lost"],
+            open=v["total"] - v["won"] - v["lost"],
+            conversion_rate=round(v["won"] / v["total"] * 100, 1) if v["total"] else 0.0,
+        )
+        for key, v in buckets.items()
+    ]
+    stats.sort(key=lambda s: (s.won, s.total), reverse=True)
+    return stats
+
+
 @router.get("/leads/notifications", response_model=List[FollowUpNotification])
 async def follow_up_notifications(user: dict = Depends(get_current_user)):
     """Leads whose follow-up date has arrived or passed and are still open.
@@ -412,6 +450,7 @@ def build_leads_query(
     status: Optional[str] = None,
     assigned_to: Optional[str] = None,
     search: Optional[str] = None,
+    sumber: Optional[str] = None,
 ) -> dict:
     """One filter definition shared by the list and CSV-export endpoints.
 
@@ -429,6 +468,8 @@ def build_leads_query(
         query["type"] = type
     if status:
         query["status"] = status
+    if sumber:
+        query["sumber"] = sumber
     if search:
         query["$or"] = [
             {"nama": {"$regex": search, "$options": "i"}},
@@ -444,9 +485,10 @@ async def list_leads(
     status: Optional[str] = None,
     assigned_to: Optional[str] = None,
     search: Optional[str] = None,
+    sumber: Optional[str] = None,
     user: dict = Depends(get_current_user),
 ):
-    query = build_leads_query(user, type, status, assigned_to, search)
+    query = build_leads_query(user, type, status, assigned_to, search, sumber)
     docs = await db.leads.find(query).sort("created_at", -1).to_list(2000)
     return [Lead(**d) for d in docs]
 

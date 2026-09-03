@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { CalendarPlus, Car, MapPin, Clock, Trash2, CheckCircle2 } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import ProtectedRoute, { useMe } from "@/components/ProtectedRoute";
+import RekapProspekPanel from "@/components/RekapProspekPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -86,6 +87,8 @@ function JadwalDialog({
     onSuccess: () => {
       toast.success("Jadwal prospek dibuat");
       queryClient.invalidateQueries({ queryKey: ["jadwal"] });
+      queryClient.invalidateQueries({ queryKey: ["jadwal-reminders"] });
+      queryClient.invalidateQueries({ queryKey: ["jadwal-rekap"] });
       setForm({ client_nama: "", lokasi: "", tanggal: "", jam: "", kendaraan: "", marketing_id: "" });
       onOpenChange(false);
     },
@@ -212,6 +215,8 @@ function HasilForm({ jadwal }: { jadwal: Jadwal }) {
     onSuccess: () => {
       toast.success("Hasil pertemuan disimpan");
       queryClient.invalidateQueries({ queryKey: ["jadwal"] });
+      queryClient.invalidateQueries({ queryKey: ["jadwal-reminders"] });
+      queryClient.invalidateQueries({ queryKey: ["jadwal-rekap"] });
     },
     onError: (err) => toast.error(errorText(err, "Gagal menyimpan hasil pertemuan")),
   });
@@ -260,6 +265,8 @@ function JadwalContent() {
     onSuccess: () => {
       toast.success("Jadwal dihapus");
       queryClient.invalidateQueries({ queryKey: ["jadwal"] });
+      queryClient.invalidateQueries({ queryKey: ["jadwal-reminders"] });
+      queryClient.invalidateQueries({ queryKey: ["jadwal-rekap"] });
     },
     onError: () => toast.error("Gagal menghapus jadwal"),
   });
@@ -298,13 +305,14 @@ function JadwalContent() {
         </div>
       </div>
 
+      <RekapProspekPanel />
+
       {error && (
         <div className="rounded-xl border border-[#FECDD3] bg-[#FFE4E6] p-4 text-sm text-[#9F1239]">
           Gagal memuat jadwal prospek.
         </div>
       )}
-      {isLoading && <p className="text-sm text-[#94A3B8]">Memuat jadwal...</p>}
-      {!isLoading && rows.length === 0 && (
+      {isLoading && <p className="text-sm text-[#94A3B8]">Memuat jadwal...</p>}      {!isLoading && rows.length === 0 && (
         <div
           data-testid="jadwal-empty-state"
           className="rounded-xl border border-dashed border-[#CBD5E1] bg-white p-10 text-center"
