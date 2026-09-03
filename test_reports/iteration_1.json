@@ -1,0 +1,100 @@
+{
+  "iteration": 1,
+  "mode": "generate",
+  "passed": 12,
+  "failed": 0,
+  "checks": [
+    {
+      "criterion": "Admin login works and lands on Dashboard",
+      "name": "admin-login-dashboard-kpis",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Login as admin@quickpro.id/admin123 -> 'Halo, Admin' visible, 'Total Leads' 21 visible on Dashboard."
+    },
+    {
+      "criterion": "Deal trend chart renders on Dashboard for admin",
+      "name": "dashboard-deal-trend-chart-admin",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "[data-testid=deal-trend-card] and [data-testid=deal-trend-chart] visible; delta text = 'Sep 2026: 4 deal (+4 vs Agu 2026)'."
+    },
+    {
+      "criterion": "Deal trend chart renders on Dashboard for admin (API)",
+      "name": "test_deal_trend_admin_sep_2026",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /api/leads/deal-trend (admin) -> 200, 6 points, Sep 2026 deals=4, Agu 2026 deals=0."
+    },
+    {
+      "criterion": "Deal trend chart also renders for a marketing user and is role-scoped",
+      "name": "dashboard-deal-trend-chart-marketing-scoped",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Login as rina@quickpro.id/password123 -> deal-trend-card visible, delta 'Sep 2026: 1 deal ...' <= 4."
+    },
+    {
+      "criterion": "Deal trend chart also renders for a marketing user and is role-scoped (API)",
+      "name": "test_deal_trend_marketing_scoped_to_own_leads",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /api/leads/deal-trend (rina) -> 200, Sep 2026 deals=1 (own leads only)."
+    },
+    {
+      "criterion": "Rekap Bulanan page loads for admin with correct current-month figures",
+      "name": "rekap-bulanan-admin-figures-and-month-picker",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Navigated to Rekap Bulanan; 'Periode: September 2026' visible, '21' and 'Budi Santoso' visible; month input then set to 2026-01 -> 'Periode: Januari 2026' and empty-state message visible."
+    },
+    {
+      "criterion": "Rekap Bulanan page loads for admin with correct current-month figures (API)",
+      "name": "test_rekap_bulanan_current_month_admin",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /api/rekap/bulanan?month=2026-09 -> 200; leads=21, deals=4, jadwal=3, jadwal_selesai=1; per_marketing: Budi Santoso=2, Rina Marlina=1, Siti Aminah=1; per_sumber non-empty."
+    },
+    {
+      "criterion": "Rekap Bulanan month picker re-queries the period (API)",
+      "name": "test_rekap_bulanan_month_picker_empty_period",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /api/rekap/bulanan?month=2026-01 -> 200; label 'Januari 2026', all 4 KPIs = 0, per_sumber = []."
+    },
+    {
+      "criterion": "Rekap Bulanan CSV export downloads",
+      "name": "test_rekap_export_csv_admin",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /api/rekap/export?month=2026-09 -> 200, content-type text/csv, content-disposition attachment, body contains 'RINGKASAN', 'PER MARKETING', 'Budi Santoso'."
+    },
+    {
+      "criterion": "Rekap Bulanan is admin-only",
+      "name": "rekap-bulanan-admin-only-access-control",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Login as rina@quickpro.id -> 'Rekap Bulanan' nav item count=0; direct nav to /rekap-bulanan shows no month-input (blocked)."
+    },
+    {
+      "criterion": "Rekap Bulanan is admin-only (API)",
+      "name": "test_rekap_bulanan_forbidden_for_marketing",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /api/rekap/bulanan?month=2026-09 as rina@quickpro.id -> 403 {'detail':'Akses ditolak, khusus untuk Admin'}."
+    },
+    {
+      "criterion": "No regression in core existing flows",
+      "name": "core-regression-leads-jadwal-notifications",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Data Leads page: search 'Dewi' -> 'Dewi Lestari' shown; Jadwal Prospek page shows 3 seeded appointments (Bambang Setiawan/Hendra Gunawan/Ahmad Wijaya); notification toast rendered; no HTTP >=400 observed on /api/* during flow."
+    }
+  ],
+  "bugs": [],
+  "action_items": [
+    {
+      "note": "Pre-existing unrelated backend tests (test_tscheck_notifications_exclude_closed.py, test_tscheck_note_closes_lead_removes_notification.py, test_tscheck_reschedule_clears_notification.py) fail with 422 'no_wa Field required' when POSTing /leads without a no_wa field. These are outside the current briefing's acceptance_matrix (notifications/reschedule flows, not deal-trend/rekap-bulanan) and were not modified or re-authored by this iteration; flagging for main agent awareness only, not counted in pass/fail totals of this iteration.",
+      "severity": "low"
+    }
+  ],
+  "retest_needed": false
+}

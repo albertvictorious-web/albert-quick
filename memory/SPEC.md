@@ -57,6 +57,13 @@ prospecting appointments and their personal notes.
   per-channel total / won / lost / open / conversion for nasabah, sorted by deals won, with a
   "Terbaik" chip. `/leads` has a matching **Sumber** filter (nasabah tab only; hidden on Pelamar)
   that also flows into the CSV export.
+- **Tren Deal per Bulan** (dashboard, both roles, role-scoped): `GET /leads/deal-trend?months=6`
+  returns one point per month (month, label, deals, nasabah, pelamar) counted by `closed_at`
+  (fallback `updated_at`) for won statuses; area chart + delta chip vs the previous month.
+- `/rekap-bulanan` (admin only): month picker → `GET /rekap/bulanan?month=YYYY-MM` with 4 KPIs
+  (leads masuk, deal, jadwal, jadwal selesai), a per-marketing table (deal / leads masuk / jadwal
+  / selesai / target progress) and a per-sumber table (total / deal / konversi, nasabah + pelamar).
+  `GET /rekap/export?month=` streams the same recap as a UTF-8 BOM CSV the admin can archive.
 - `/catatan`: personal notes, optional lead link (only a lead the author may see). Admin views all
   but cannot edit/delete another user's note (403).
 - `/akun-marketing` (admin): create/edit/delete accounts + monthly target panel.
