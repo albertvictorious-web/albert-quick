@@ -1,17 +1,22 @@
 import csv
 import io
+import json
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Dict, List, Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 
 from lib.auth import get_current_admin, get_current_user
 from lib.db import db
+from lib.import_mapping import FIELD_KEYS, FIELD_LABELS, suggest_mapping, unmapped
+from lib.tabular import TableError, parse_table
 from models.lead import (
     AssignRequest,
     BulkAssignRequest,
     BulkAssignResult,
     FollowUpNotification,
+    ImportField,
+    ImportPreview,
     ImportResult,
     Lead,
     LeadCreate,
@@ -50,6 +55,43 @@ IMPORT_COLUMNS = [
     "tanggal_follow_up",
     "marketing_email",
 ]
+
+# Words that tell a row apart when the file carries its own "tipe" column.
+PELAMAR_HINTS = ("pelamar", "lamar", "applicant", "kandidat", "job", "karyawan", "rekrut")
+NASABAH_HINTS = ("nasabah", "client", "klien", "customer", "prospek", "investor")
+
+
+async def _read_upload(file: UploadFile):
+    """Turn any .xlsx/.xls/.csv upload into (headers, rows) or a 400 the admin can act on."""
+    raw = await file.read()
+    try:
+        return parse_table(file.filename or "", raw)
+    except TableError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def _resolve_mapping(raw: Optional[str], headers: List[str]) -> Dict[str, Optional[str]]:
+    """Admin-confirmed field -> column choice; without one, fall back to the automatic guess."""
+    if not raw:
+        return suggest_mapping(headers)
+    try:
+        chosen = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Pemetaan kolom tidak valid") from exc
+    if not isinstance(chosen, dict):
+        raise HTTPException(status_code=400, detail="Pemetaan kolom tidak valid")
+    # Anything not naming a real column is dropped rather than trusted.
+    return {key: (chosen.get(key) if chosen.get(key) in headers else None) for key in FIELD_KEYS}
+
+
+def _row_type(raw: str, fallback: str) -> str:
+    """A per-row 'tipe' cell wins; otherwise every row takes the type the admin picked."""
+    value = raw.strip().lower()
+    if any(hint in value for hint in PELAMAR_HINTS):
+        return "pelamar"
+    if any(hint in value for hint in NASABAH_HINTS):
+        return "nasabah"
+    return fallback
 
 
 @router.get("/leads/team-performance", response_model=List[TeamPerformance])
@@ -256,28 +298,44 @@ async def import_template(admin: dict = Depends(get_current_admin)):
     )
 
 
-@router.post("/leads/import", response_model=ImportResult)
-async def import_leads(file: UploadFile = File(...), admin: dict = Depends(get_current_admin)):
-    """Bulk-create leads from the template CSV. Bad rows are reported, good rows still land."""
-    raw = await file.read()
-    if not raw:
-        raise HTTPException(status_code=400, detail="File kosong")
-    if len(raw) > 5 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="Ukuran file maksimal 5 MB")
-    try:
-        text = raw.decode("utf-8-sig")
-    except UnicodeDecodeError:
-        text = raw.decode("latin-1")
+@router.post("/leads/import/preview", response_model=ImportPreview)
+async def import_preview(file: UploadFile = File(...), admin: dict = Depends(get_current_admin)):
+    """Read any .xlsx/.xls/.csv, guess the column mapping and show the admin what will land."""
+    headers, rows = await _read_upload(file)
+    mapping = suggest_mapping(headers)
+    return ImportPreview(
+        headers=headers,
+        mapping=mapping,
+        fields=[ImportField(key=k, label=l, required=r) for k, l, r in FIELD_LABELS],
+        sample_rows=[dict(zip(headers, row)) for row in rows[:5]],
+        total_rows=len(rows),
+        unmapped_headers=unmapped(headers, mapping),
+    )
 
-    reader = csv.DictReader(io.StringIO(text))
-    if not reader.fieldnames:
-        raise HTTPException(status_code=400, detail="File CSV tidak memiliki baris header")
-    normalised = {(name or "").strip().lower() for name in reader.fieldnames}
-    if "nama" not in normalised or "no_wa" not in normalised:
+
+@router.post("/leads/import", response_model=ImportResult)
+async def import_leads(
+    file: UploadFile = File(...),
+    mapping: Optional[str] = Form(None),
+    lead_type: str = Form("nasabah"),
+    admin: dict = Depends(get_current_admin),
+):
+    """Bulk-create leads from any spreadsheet. Bad rows are reported, good rows still land.
+
+    `mapping` is the admin-confirmed field -> column JSON from the preview step; without it the
+    automatic guess is used, which keeps the old template-shaped CSV working unchanged.
+    """
+    if lead_type not in ("nasabah", "pelamar"):
+        raise HTTPException(status_code=400, detail="Tipe leads harus 'nasabah' atau 'pelamar'")
+
+    headers, rows = await _read_upload(file)
+    column_of = _resolve_mapping(mapping, headers)
+    if not column_of.get("nama") or not column_of.get("no_wa"):
         raise HTTPException(
             status_code=400,
-            detail="Kolom wajib 'nama' dan 'no_wa' tidak ditemukan. Unduh template terlebih dahulu.",
+            detail="Kolom Nama dan No. WhatsApp belum dipilih. Tentukan keduanya di layar pemetaan kolom.",
         )
+    extra_columns = unmapped(headers, column_of)
 
     marketing = await db.users.find({"role": "marketing"}).to_list(1000)
     by_email = {m["email"].lower(): m for m in marketing}
@@ -287,49 +345,64 @@ async def import_leads(file: UploadFile = File(...), admin: dict = Depends(get_c
     skipped = 0
     now = datetime.now(timezone.utc)
 
-    for line_no, row in enumerate(reader, start=2):
-        clean = {(k or "").strip().lower(): (v or "").strip() for k, v in row.items()}
-        nama = clean.get("nama", "")
-        no_wa = clean.get("no_wa", "")
+    for line_no, values in enumerate(rows, start=2):
+        row = dict(zip(headers, values))
+
+        def value_of(field: str, source: dict = row) -> str:
+            column = column_of.get(field)
+            return (source.get(column) or "").strip() if column else ""
+
+        nama = value_of("nama")
+        no_wa = value_of("no_wa")
         if not nama or not no_wa:
             skipped += 1
             errors.append(f"Baris {line_no}: nama atau no_wa kosong — dilewati")
             continue
 
-        lead_type = clean.get("tipe", "nasabah").lower()
-        if lead_type not in ("nasabah", "pelamar"):
-            skipped += 1
-            errors.append(f"Baris {line_no}: tipe '{lead_type}' tidak dikenal — dilewati")
-            continue
-
-        usia_raw = clean.get("usia", "")
+        row_type = _row_type(value_of("tipe"), lead_type)
+        usia_raw = value_of("usia")
         try:
-            usia = int(usia_raw) if usia_raw else None
+            usia = int(float(usia_raw)) if usia_raw else None
         except ValueError:
             usia = None
             errors.append(f"Baris {line_no}: usia '{usia_raw}' bukan angka — dikosongkan")
 
-        owner = by_email.get(clean.get("marketing_email", "").lower())
-        status = clean.get("status") or "Baru"
+        owner = by_email.get(value_of("marketing_email").lower())
+        status = value_of("status") or "Baru"
+
+        # Columns nobody claimed still carry meaning, so they ride along as a progress note.
+        notes: List[ProgressNote] = []
+        leftovers = [f"{c}: {row[c].strip()}" for c in extra_columns if (row.get(c) or "").strip()]
+        if leftovers:
+            notes.append(
+                ProgressNote(
+                    text="Data tambahan dari file import — " + " · ".join(leftovers),
+                    created_by=admin["id"],
+                    created_by_name=admin["name"],
+                    created_at=now,
+                )
+            )
 
         lead = Lead(
-            type=lead_type,  # type: ignore[arg-type]
+            type=row_type,  # type: ignore[arg-type]
             nama=nama,
             no_wa=no_wa,
             usia=usia,
-            kota=clean.get("kota") or None,
-            profesi=clean.get("profesi") or None if lead_type == "nasabah" else None,
-            pernah_trading=clean.get("pernah_trading") or None if lead_type == "nasabah" else None,
-            sumber=clean.get("sumber") or None if lead_type == "nasabah" else None,
-            pendidikan=clean.get("pendidikan") or None if lead_type == "pelamar" else None,
+            kota=value_of("kota") or None,
+            profesi=value_of("profesi") or None if row_type == "nasabah" else None,
+            pernah_trading=value_of("pernah_trading") or None if row_type == "nasabah" else None,
+            sumber=value_of("sumber") or None if row_type == "nasabah" else None,
+            pendidikan=value_of("pendidikan") or None if row_type == "pelamar" else None,
             status=status,
-            tanggal_follow_up=clean.get("tanggal_follow_up") or None,
+            catatan=value_of("catatan") or None,
+            tanggal_follow_up=value_of("tanggal_follow_up") or None,
             assigned_to=owner["id"] if owner else None,
             assigned_to_name=owner["name"] if owner else None,
             created_by=admin["id"],
             created_by_name=admin["name"],
             created_at=now,
             updated_at=now,
+            notes=notes,
         )
         created.append(lead.model_dump())
 
@@ -337,6 +410,7 @@ async def import_leads(file: UploadFile = File(...), admin: dict = Depends(get_c
         await db.leads.insert_many(created)
 
     return ImportResult(created=len(created), skipped=skipped, errors=errors[:20])
+
 
 
 @router.post("/leads/bulk-assign", response_model=BulkAssignResult)

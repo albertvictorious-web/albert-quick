@@ -52,6 +52,23 @@ export interface ImportResult {
   errors: string[];
 }
 
+// Mirrors ImportField in backend/models/lead.py
+export interface ImportField {
+  key: string;
+  label: string;
+  required: boolean;
+}
+
+// Mirrors ImportPreview in backend/models/lead.py
+export interface ImportPreview {
+  headers: string[];
+  mapping: Record<string, string | null>;
+  fields: ImportField[];
+  sample_rows: Record<string, string>[];
+  total_rows: number;
+  unmapped_headers: string[];
+}
+
 // Mirrors UploadedFile in backend/models/lead.py
 export interface UploadedFile {
   file_id: string;

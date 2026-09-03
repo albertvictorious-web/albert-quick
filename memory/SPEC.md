@@ -38,9 +38,18 @@ prospecting appointments and their personal notes.
   own target card.
 - `/leads`: tabs Nasabah/Pelamar, search (nama/no_wa/kota), status + marketing filters (incl.
   "Belum Ditugaskan"), row → detail sheet (fields, CV link, progress notes, reschedule follow-up,
-  assign/transfer, delete when allowed). Admin-only: checkbox bulk assign, **Upload CSV** import
-  (`/api/leads/import` + `/api/leads/import-template`), **Auto Bagi Rata** round-robin. Everyone:
+  assign/transfer, delete when allowed). Admin-only: checkbox bulk assign, **Upload Excel / CSV**
+  import, **Auto Bagi Rata** round-robin. Everyone:
   Export CSV honouring current filters and role scope.
+- **Template-free import** (admin): `POST /leads/import/preview` reads any `.xlsx`, `.xls`, `.xlsm`
+  or `.csv` (max 5 MB, first sheet, delimiter sniffed for CSV) and returns headers, sample rows and
+  an auto-guessed `mapping` (field key → column) built from `backend/lib/import_mapping.py` aliases
+  ("Nama Lengkap"→nama, "No HP"/"WhatsApp"→no_wa, "Umur"→usia, "Domisili"→kota, …). The dialog shows
+  that guess for the admin to correct, then `POST /leads/import` takes the same file plus the
+  confirmed `mapping` JSON and a `lead_type` (nasabah|pelamar) applied to every row unless the file
+  carries its own tipe column. Columns nobody mapped are appended to each lead as a ProgressNote
+  ("Data tambahan dari file import — …") so no data is lost. `GET /leads/import-template` still
+  serves the old CSV template, now optional.
 - **Delete rule**: admin deletes any lead; marketing only leads where they are both
   `created_by` and `assigned_to` (i.e. self-added, not admin-given) — else 403.
 - `/jadwal-prospek`: create appointment (admin picks the marketing owner, marketing schedules for

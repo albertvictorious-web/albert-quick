@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -156,6 +156,25 @@ class ImportResult(BaseModel):
     created: int
     skipped: int
     errors: List[str] = []
+
+
+class ImportField(BaseModel):
+    """One mappable lead field, described for the column-mapping screen."""
+
+    key: str
+    label: str
+    required: bool
+
+
+class ImportPreview(BaseModel):
+    """What the admin confirms before any row is written."""
+
+    headers: List[str]
+    mapping: Dict[str, Optional[str]]  # field key -> chosen column (auto-guessed)
+    fields: List[ImportField]
+    sample_rows: List[Dict[str, str]]
+    total_rows: int
+    unmapped_headers: List[str]
 
 
 class UploadedFile(BaseModel):

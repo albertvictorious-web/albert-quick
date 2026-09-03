@@ -1,0 +1,101 @@
+{
+  "iteration": 2,
+  "mode": "generate",
+  "feature": "Leads Excel/CSV import with auto-detected column mapping",
+  "passed": 11,
+  "failed": 0,
+  "flaky": 0,
+  "blocked": 0,
+  "test_error": 0,
+  "retest_needed": false,
+  "bugs": [],
+  "action_items": [
+    "Pre-existing, unrelated backend suite failures (test_tscheck_rekap_bulanan, test_tscheck_notifications_exclude_closed, test_tscheck_note_closes_lead_removes_notification, test_tscheck_reschedule_clears_notification) are failing because POST /leads now requires a 'no_wa' field while those older tests send 'no_hp'. Not part of the import feature under test in this iteration; flagging for main agent to fix or update those tests."
+  ],
+  "checks": [
+    {
+      "criterion": "Upload accepts a real .xlsx with non-template headers and auto-detects the mapping",
+      "name": "test_tscheck_import_preview_autodetect.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/leads/import/preview with real .xlsx (openpyxl) headers 'Nama Lengkap, No. HP / WhatsApp, Umur, Kota Domisili, Pekerjaan, Dari Mana Tahu, Kode Referensi' -> 200; mapping nama='Nama Lengkap', no_wa='No. HP / WhatsApp', usia='Umur', kota='Kota Domisili', profesi='Pekerjaan', sumber='Dari Mana Tahu', unmapped_headers=['Kode Referensi']."
+    },
+    {
+      "criterion": "Mapping screen appears in the UI with the guess pre-filled and is editable",
+      "name": "import-mapping-screen-shows-detected-mapping",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "As admin on /leads, Upload Excel/CSV opens dialog; uploading CSV with 7 headers shows import-preview-summary ('...csv · 1 baris · 7 kolom terbaca'), import-map-select-nama pre-set to 'Nama Lengkap', import-map-select-sumber pre-set to 'Dari Mana Tahu', import-leftover-columns names 'Kode Referensi', import-sample-table shows first row. Setting nama select to '— tidak dipakai —' surfaced import-missing-required and disabled import-confirm-button (also covers required-field guard UI)."
+    },
+    {
+      "criterion": "Confirming the mapping actually creates the leads",
+      "name": "import-confirm-creates-searchable-leads",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Uploaded CSV with a unique 'tscheck-import-confirm-<ts>' name, confirmed mapping, import-result showed '1 leads dibuat · 0 dilewati'; closed dialog, searched Nasabah table by name, row appeared, opened detail sheet."
+    },
+    {
+      "criterion": "Confirming the mapping actually creates the leads (API)",
+      "name": "test_tscheck_import_confirm_creates_leads.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/leads/import with explicit mapping -> 200, created=1 skipped=0; GET /api/leads?type=nasabah&search=<name> -> 200, returns the created lead with matching kota."
+    },
+    {
+      "criterion": "Unmapped columns are preserved as a progress note on each imported lead",
+      "name": "import-confirm-creates-searchable-leads",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Same flow: lead-detail-sheet lead-notes-timeline shows 'Data tambahan dari file import — Info Tambahan: REF-001'."
+    },
+    {
+      "criterion": "Unmapped columns are preserved as a progress note on each imported lead (API)",
+      "name": "test_tscheck_import_progress_note.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/leads/import with 'Kode Referensi' left unmapped -> created=1; GET /api/leads/{id} notes[0].text starts with 'Data tambahan dari file import' and contains 'Kode Referensi: REF-001'."
+    },
+    {
+      "criterion": "Admin's lead-type choice applies to every row when the file has no tipe column",
+      "name": "import-lead-type-applies-when-no-tipe-column",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Chose 'Pelamar Kerja' before uploading a tipe-less CSV; imported row absent from Nasabah tab (count 0) and present on Pelamar Kerja tab after switching."
+    },
+    {
+      "criterion": "Admin's lead-type choice applies to every row when the file has no tipe column (API)",
+      "name": "test_tscheck_import_default_lead_type.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/leads/import lead_type='pelamar' with tipe-less file -> created=1; GET /api/leads?type=nasabah&search=<name> returns [], GET /api/leads?type=pelamar&search=<name> returns the row with type='pelamar'."
+    },
+    {
+      "criterion": "Required-field guard blocks a bad mapping",
+      "name": "test_tscheck_import_required_field_guard.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/leads/import with mapping {\"no_wa\":\"Umur\"} (nama unresolved) -> 400. UI half covered inside import-mapping-screen-shows-detected-mapping (missing-required banner + disabled confirm button)."
+    },
+    {
+      "criterion": "Legacy template CSV still imports unchanged",
+      "name": "test_tscheck_import_legacy_template_backward_compat.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /api/leads/import-template -> 200 CSV; POSTed straight back to /api/leads/import with no mapping field -> 200, created=2 skipped=0 (backward compatibility with pre-mapping contract)."
+    },
+    {
+      "criterion": "Bad input and role scope are rejected",
+      "name": "test_tscheck_import_bad_input_and_role_scope.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "POST /api/leads/import/preview with a .pdf -> 400 with Indonesian detail; no session -> 401; as rina@quickpro.id (marketing) -> 403."
+    },
+    {
+      "criterion": "Bad input and role scope are rejected (Upload button admin-only, UI)",
+      "name": "import-upload-button-admin-only",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Logged in as rina@quickpro.id (marketing) on /leads: open-import-leads-button has count 0 (not rendered)."
+    }
+  ]
+}
