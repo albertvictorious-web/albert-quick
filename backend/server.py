@@ -17,6 +17,9 @@ load_dotenv(ROOT_DIR / '.env')
 # MongoDB connection
 from lib.db import client, db
 from routers.auth import router as auth_router
+from routers.catatan import router as catatan_router
+from routers.files import router as files_router
+from routers.jadwal import router as jadwal_router
 from routers.leads import router as leads_router
 from routers.targets import router as targets_router
 from routers.transfers import router as transfers_router
@@ -67,6 +70,9 @@ api_router.include_router(auth_router)
 api_router.include_router(leads_router)
 api_router.include_router(targets_router)
 api_router.include_router(transfers_router)
+api_router.include_router(catatan_router)
+api_router.include_router(jadwal_router)
+api_router.include_router(files_router)
 
 # Include the router in the main app
 app.include_router(api_router)

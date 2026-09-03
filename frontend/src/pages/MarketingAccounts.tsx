@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { UserPlus, Trash2 } from "lucide-react";
+import { UserPlus, Trash2, Pencil } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import MonthlyTargetsPanel from "@/components/MonthlyTargetsPanel";
@@ -17,7 +17,7 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
-import { apiDelete, apiGet, apiPost, ApiError } from "@/lib/api";
+import { apiDelete, apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import type { UserPublic } from "@/lib/types";
 
 function CreateMarketingDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
@@ -96,8 +96,115 @@ function CreateMarketingDialog({ open, onOpenChange }: { open: boolean; onOpenCh
   );
 }
 
+function EditMarketingDialog({
+  user,
+  open,
+  onOpenChange,
+}: {
+  user: UserPublic | null;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+}) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const queryClient = useQueryClient();
+
+  // Prefill whenever a different account is opened.
+  useEffect(() => {
+    if (user) {
+      setName(user.name);
+      setEmail(user.email);
+      setPassword("");
+      setError("");
+    }
+  }, [user]);
+
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      apiPatch<UserPublic>(`/auth/marketing/${user?.id}`, {
+        name: name || null,
+        email: email || null,
+        password: password || null,
+      }),
+    onSuccess: (saved) => {
+      toast.success(`Akun ${saved.name} diperbarui`);
+      queryClient.invalidateQueries({ queryKey: ["marketing-users"] });
+      queryClient.invalidateQueries({ queryKey: ["assignable-marketing"] });
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      queryClient.invalidateQueries({ queryKey: ["targets"] });
+      onOpenChange(false);
+    },
+    onError: (err) => {
+      setError(
+        err instanceof ApiError &&
+          typeof err.body === "object" &&
+          err.body &&
+          "detail" in (err.body as Record<string, unknown>)
+          ? String((err.body as Record<string, unknown>).detail)
+          : "Gagal memperbarui akun"
+      );
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent data-testid="edit-marketing-dialog">
+        <DialogHeader>
+          <DialogTitle>Ubah Akun Marketing</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-3 py-2">
+          <div className="grid gap-1.5">
+            <Label>Nama Lengkap</Label>
+            <Input
+              data-testid="edit-marketing-input-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Email Login</Label>
+            <Input
+              type="email"
+              data-testid="edit-marketing-input-email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Password Baru (kosongkan bila tidak diubah)</Label>
+            <Input
+              type="password"
+              data-testid="edit-marketing-input-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Minimal 6 karakter"
+            />
+          </div>
+          {error && <p className="text-sm font-medium text-[#BE123C]">{error}</p>}
+        </div>
+        <DialogFooter>
+          <DialogClose render={<Button variant="outline">Batal</Button>} />
+          <Button
+            data-testid="edit-marketing-submit-button"
+            disabled={saveMutation.isPending}
+            onClick={() => {
+              setError("");
+              saveMutation.mutate();
+            }}
+          >
+            {saveMutation.isPending ? "Menyimpan..." : "Simpan Perubahan"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function MarketingAccountsContent() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editUser, setEditUser] = useState<UserPublic | null>(null);
   const queryClient = useQueryClient();
 
   const { data: users, isLoading } = useQuery<UserPublic[]>({
@@ -142,20 +249,37 @@ function MarketingAccountsContent() {
                 <p className="font-heading text-sm font-semibold text-[#0F172A]">{u.name}</p>
                 <p className="text-xs text-[#94A3B8]">{u.email}</p>
               </div>
-              <button
-                type="button"
-                data-testid={`delete-marketing-button-${u.id}`}
-                onClick={() => deleteMutation.mutate(u.id)}
-                className="rounded-lg p-2 text-[#94A3B8] transition-colors duration-200 hover:bg-[#FFE4E6] hover:text-[#BE123C]"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  data-testid={`edit-marketing-button-${u.id}`}
+                  onClick={() => {
+                    setEditUser(u);
+                  }}
+                  className="rounded-lg p-2 text-[#94A3B8] transition-colors duration-200 hover:bg-[#F0FDFA] hover:text-[#0F766E]"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  data-testid={`delete-marketing-button-${u.id}`}
+                  onClick={() => deleteMutation.mutate(u.id)}
+                  className="rounded-lg p-2 text-[#94A3B8] transition-colors duration-200 hover:bg-[#FFE4E6] hover:text-[#BE123C]"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
       <CreateMarketingDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+      <EditMarketingDialog
+        user={editUser}
+        open={!!editUser}
+        onOpenChange={(o) => !o && setEditUser(null)}
+      />
 
       <MonthlyTargetsPanel />
     </div>

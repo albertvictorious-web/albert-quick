@@ -1,7 +1,9 @@
+import csv
+import io
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 
 from lib.auth import get_current_admin, get_current_user
 from lib.db import db
@@ -10,6 +12,7 @@ from models.lead import (
     BulkAssignRequest,
     BulkAssignResult,
     FollowUpNotification,
+    ImportResult,
     Lead,
     LeadCreate,
     LeadStats,
@@ -29,6 +32,22 @@ router = APIRouter()
 TERMINAL_STATUSES = {"Deal", "Gagal", "Diterima", "Ditolak"}
 WON_STATUSES = {"Deal", "Diterima"}
 LOST_STATUSES = {"Gagal", "Ditolak"}
+
+# Header row of the bulk-import template.
+IMPORT_COLUMNS = [
+    "tipe",
+    "nama",
+    "no_wa",
+    "usia",
+    "kota",
+    "profesi",
+    "pernah_trading",
+    "sumber",
+    "pendidikan",
+    "status",
+    "tanggal_follow_up",
+    "marketing_email",
+]
 
 
 @router.get("/leads/team-performance", response_model=List[TeamPerformance])
@@ -135,14 +154,14 @@ async def export_leads(
     headers = [
         "Nama",
         "Tipe",
-        "No HP",
-        "Email",
-        "Alamat",
-        "Produk",
-        "Posisi",
-        "NIK",
-        "Tanggal Lahir",
+        "No WhatsApp",
+        "Usia",
+        "Kota Domisili",
+        "Profesi",
+        "Pernah Trading",
         "Sumber",
+        "Pendidikan",
+        "CV",
         "Status",
         "Tanggal Follow Up",
         "Marketing",
@@ -165,14 +184,14 @@ async def export_leads(
                 for v in [
                     d.get("nama"),
                     "Nasabah" if d.get("type") == "nasabah" else "Pelamar Kerja",
-                    d.get("no_hp"),
-                    d.get("email"),
-                    d.get("alamat"),
-                    d.get("produk"),
-                    d.get("posisi"),
-                    d.get("nik"),
-                    d.get("tanggal_lahir"),
+                    d.get("no_wa"),
+                    d.get("usia"),
+                    d.get("kota"),
+                    d.get("profesi"),
+                    d.get("pernah_trading"),
                     d.get("sumber"),
+                    d.get("pendidikan"),
+                    d.get("cv_filename") or ("Ada" if d.get("cv_file_id") else ""),
                     d.get("status"),
                     d.get("tanggal_follow_up"),
                     d.get("assigned_to_name") or "Belum Ditugaskan",
@@ -189,6 +208,132 @@ async def export_leads(
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="leads-quickpro-{stamp}.csv"'},
     )
+
+
+@router.get("/leads/import-template")
+async def import_template(admin: dict = Depends(get_current_admin)):
+    """Blank CSV with the exact headers POST /leads/import expects, plus one example row each."""
+    headers = IMPORT_COLUMNS
+    examples = [
+        [
+            "nasabah",
+            "Contoh Nasabah",
+            "081234567890",
+            "35",
+            "Jakarta Selatan",
+            "Karyawan Swasta",
+            "Belum",
+            "Instagram",
+            "",
+            "Baru",
+            "",
+            "",
+        ],
+        [
+            "pelamar",
+            "Contoh Pelamar",
+            "082234567890",
+            "24",
+            "Bandung",
+            "",
+            "",
+            "",
+            "Sarjana",
+            "Baru",
+            "",
+            "",
+        ],
+    ]
+    lines = [",".join(headers)] + [",".join(row) for row in examples]
+    body = "\ufeff" + "\n".join(lines)
+    return Response(
+        content=body,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="template-import-leads.csv"'},
+    )
+
+
+@router.post("/leads/import", response_model=ImportResult)
+async def import_leads(file: UploadFile = File(...), admin: dict = Depends(get_current_admin)):
+    """Bulk-create leads from the template CSV. Bad rows are reported, good rows still land."""
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="File kosong")
+    if len(raw) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Ukuran file maksimal 5 MB")
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = raw.decode("latin-1")
+
+    reader = csv.DictReader(io.StringIO(text))
+    if not reader.fieldnames:
+        raise HTTPException(status_code=400, detail="File CSV tidak memiliki baris header")
+    normalised = {(name or "").strip().lower() for name in reader.fieldnames}
+    if "nama" not in normalised or "no_wa" not in normalised:
+        raise HTTPException(
+            status_code=400,
+            detail="Kolom wajib 'nama' dan 'no_wa' tidak ditemukan. Unduh template terlebih dahulu.",
+        )
+
+    marketing = await db.users.find({"role": "marketing"}).to_list(1000)
+    by_email = {m["email"].lower(): m for m in marketing}
+
+    created: list = []
+    errors: list = []
+    skipped = 0
+    now = datetime.now(timezone.utc)
+
+    for line_no, row in enumerate(reader, start=2):
+        clean = {(k or "").strip().lower(): (v or "").strip() for k, v in row.items()}
+        nama = clean.get("nama", "")
+        no_wa = clean.get("no_wa", "")
+        if not nama or not no_wa:
+            skipped += 1
+            errors.append(f"Baris {line_no}: nama atau no_wa kosong — dilewati")
+            continue
+
+        lead_type = clean.get("tipe", "nasabah").lower()
+        if lead_type not in ("nasabah", "pelamar"):
+            skipped += 1
+            errors.append(f"Baris {line_no}: tipe '{lead_type}' tidak dikenal — dilewati")
+            continue
+
+        usia_raw = clean.get("usia", "")
+        try:
+            usia = int(usia_raw) if usia_raw else None
+        except ValueError:
+            usia = None
+            errors.append(f"Baris {line_no}: usia '{usia_raw}' bukan angka — dikosongkan")
+
+        owner = by_email.get(clean.get("marketing_email", "").lower())
+        status = clean.get("status") or "Baru"
+
+        lead = Lead(
+            type=lead_type,  # type: ignore[arg-type]
+            nama=nama,
+            no_wa=no_wa,
+            usia=usia,
+            kota=clean.get("kota") or None,
+            profesi=clean.get("profesi") or None if lead_type == "nasabah" else None,
+            pernah_trading=clean.get("pernah_trading") or None if lead_type == "nasabah" else None,
+            sumber=clean.get("sumber") or None if lead_type == "nasabah" else None,
+            pendidikan=clean.get("pendidikan") or None if lead_type == "pelamar" else None,
+            status=status,
+            tanggal_follow_up=clean.get("tanggal_follow_up") or None,
+            assigned_to=owner["id"] if owner else None,
+            assigned_to_name=owner["name"] if owner else None,
+            created_by=admin["id"],
+            created_by_name=admin["name"],
+            created_at=now,
+            updated_at=now,
+        )
+        created.append(lead.model_dump())
+
+    if created:
+        await db.leads.insert_many(created)
+
+    return ImportResult(created=len(created), skipped=skipped, errors=errors[:20])
 
 
 @router.post("/leads/bulk-assign", response_model=BulkAssignResult)
@@ -287,8 +432,8 @@ def build_leads_query(
     if search:
         query["$or"] = [
             {"nama": {"$regex": search, "$options": "i"}},
-            {"no_hp": {"$regex": search, "$options": "i"}},
-            {"email": {"$regex": search, "$options": "i"}},
+            {"no_wa": {"$regex": search, "$options": "i"}},
+            {"kota": {"$regex": search, "$options": "i"}},
         ]
     return query
 
@@ -432,8 +577,17 @@ async def assign_lead(lead_id: str, body: AssignRequest, user: dict = Depends(ge
 
 
 @router.delete("/leads/{lead_id}")
-async def delete_lead(lead_id: str, admin: dict = Depends(get_current_admin)):
-    result = await db.leads.delete_one({"id": lead_id})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Leads tidak ditemukan")
+async def delete_lead(lead_id: str, user: dict = Depends(get_current_user)):
+    """Admin may delete any lead; marketing only the leads they entered themselves."""
+    doc = await get_lead_or_404(lead_id)
+    if user["role"] != "admin":
+        if doc.get("assigned_to") != user["id"] or doc.get("created_by") != user["id"]:
+            raise HTTPException(
+                status_code=403,
+                detail="Anda hanya dapat menghapus leads yang Anda tambahkan sendiri",
+            )
+    await db.leads.delete_one({"id": lead_id})
+    await db.catatan.update_many(
+        {"lead_id": lead_id}, {"$set": {"lead_id": None, "lead_nama": None}}
+    )
     return {"message": "Leads dihapus"}

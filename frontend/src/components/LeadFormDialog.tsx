@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { FileUp, Loader2, Paperclip } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -23,30 +24,41 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiGet, apiPost, ApiError } from "@/lib/api";
 import {
-  PRODUK_OPTIONS,
-  SUMBER_NASABAH_OPTIONS,
-  POSISI_OPTIONS,
-  SUMBER_PELAMAR_OPTIONS,
+  SUMBER_OPTIONS,
+  PENDIDIKAN_OPTIONS,
+  TRADING_OPTIONS,
   type Lead,
   type LeadType,
+  type UploadedFile,
   type UserPublic,
 } from "@/lib/types";
 import { useMe } from "@/components/ProtectedRoute";
 
 const EMPTY_FORM = {
   nama: "",
-  no_hp: "",
-  email: "",
-  alamat: "",
-  produk: "",
-  posisi: "",
-  nik: "",
-  tanggal_lahir: "",
+  no_wa: "",
+  usia: "",
+  kota: "",
+  profesi: "",
+  pernah_trading: "",
   sumber: "",
+  pendidikan: "",
   catatan: "",
   tanggal_follow_up: "",
   assigned_to: "",
 };
+
+function errorText(err: unknown, fallback: string) {
+  if (
+    err instanceof ApiError &&
+    typeof err.body === "object" &&
+    err.body &&
+    "detail" in (err.body as Record<string, unknown>)
+  ) {
+    return String((err.body as Record<string, unknown>).detail);
+  }
+  return fallback;
+}
 
 export default function LeadFormDialog({
   open,
@@ -60,6 +72,9 @@ export default function LeadFormDialog({
   const { data: me } = useMe();
   const [type, setType] = useState<LeadType>(defaultType);
   const [form, setForm] = useState({ ...EMPTY_FORM });
+  const [cv, setCv] = useState<UploadedFile | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
   const { data: marketingList } = useQuery<UserPublic[]>({
@@ -73,14 +88,15 @@ export default function LeadFormDialog({
       apiPost<Lead>("/leads", {
         type,
         nama: form.nama,
-        no_hp: form.no_hp,
-        email: form.email || null,
-        alamat: type === "nasabah" ? form.alamat || null : null,
-        produk: type === "nasabah" ? form.produk || null : null,
-        posisi: type === "pelamar" ? form.posisi || null : null,
-        nik: type === "pelamar" ? form.nik || null : null,
-        tanggal_lahir: type === "pelamar" ? form.tanggal_lahir || null : null,
-        sumber: form.sumber,
+        no_wa: form.no_wa,
+        usia: form.usia ? Number(form.usia) : null,
+        kota: form.kota || null,
+        profesi: type === "nasabah" ? form.profesi || null : null,
+        pernah_trading: type === "nasabah" ? form.pernah_trading || null : null,
+        sumber: type === "nasabah" ? form.sumber || null : null,
+        pendidikan: type === "pelamar" ? form.pendidikan || null : null,
+        cv_file_id: type === "pelamar" ? cv?.file_id ?? null : null,
+        cv_filename: type === "pelamar" ? cv?.filename ?? null : null,
         status: "Baru",
         catatan: form.catatan || null,
         tanggal_follow_up: form.tanggal_follow_up || null,
@@ -90,24 +106,54 @@ export default function LeadFormDialog({
       toast.success("Leads baru berhasil ditambahkan");
       queryClient.invalidateQueries({ queryKey: ["leads"] });
       queryClient.invalidateQueries({ queryKey: ["leads-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["team-performance"] });
       queryClient.invalidateQueries({ queryKey: ["follow-up-notifications"] });
       setForm({ ...EMPTY_FORM });
+      setCv(null);
       onOpenChange(false);
     },
-    onError: (err) => {
-      const msg = err instanceof ApiError ? String(err.body) : "Gagal menambahkan leads";
-      toast.error(msg);
-    },
+    onError: (err) => toast.error(errorText(err, "Gagal menambahkan leads")),
   });
+
+  const handleCvChange = async (file: File | undefined) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      // FormData must not carry a JSON content-type, so this one call goes direct.
+      const res = await fetch("/api/files/cv", { method: "POST", body, credentials: "include" });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({ detail: "Gagal mengunggah CV" }));
+        throw new Error(payload.detail ?? "Gagal mengunggah CV");
+      }
+      const uploaded = (await res.json()) as UploadedFile;
+      setCv(uploaded);
+      toast.success(`CV terunggah: ${uploaded.filename}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengunggah CV");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   const update = (key: keyof typeof form) => (e: { target: { value: string } }) =>
     setForm((f) => ({ ...f, [key]: e.target.value }));
 
-  const sumberOptions = type === "nasabah" ? SUMBER_NASABAH_OPTIONS : SUMBER_PELAMAR_OPTIONS;
+  const canSubmit =
+    !!form.nama &&
+    !!form.no_wa &&
+    (type === "pelamar" || !!form.sumber) &&
+    !createMutation.isPending &&
+    !uploading;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg" data-testid="lead-form-dialog">
+      <DialogContent
+        className="max-h-[85vh] overflow-y-auto sm:max-w-lg"
+        data-testid="lead-form-dialog"
+      >
         <DialogHeader>
           <DialogTitle>Tambah Leads Baru</DialogTitle>
         </DialogHeader>
@@ -126,35 +172,88 @@ export default function LeadFormDialog({
         <div className="grid gap-3 py-2">
           <div className="grid gap-1.5">
             <Label htmlFor="nama">Nama Lengkap</Label>
-            <Input id="nama" data-testid="lead-form-input-nama" value={form.nama} onChange={update("nama")} />
+            <Input
+              id="nama"
+              data-testid="lead-form-input-nama"
+              value={form.nama}
+              onChange={update("nama")}
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
-              <Label htmlFor="no_hp">No. WhatsApp / HP</Label>
-              <Input id="no_hp" data-testid="lead-form-input-no-hp" value={form.no_hp} onChange={update("no_hp")} />
+              <Label htmlFor="no_wa">No. WhatsApp</Label>
+              <Input
+                id="no_wa"
+                data-testid="lead-form-input-no-wa"
+                value={form.no_wa}
+                onChange={update("no_wa")}
+                placeholder="0812xxxxxxx"
+              />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" data-testid="lead-form-input-email" value={form.email} onChange={update("email")} />
+              <Label htmlFor="usia">Usia</Label>
+              <Input
+                id="usia"
+                type="number"
+                min={0}
+                data-testid="lead-form-input-usia"
+                value={form.usia}
+                onChange={update("usia")}
+              />
             </div>
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="kota">Kota Domisili</Label>
+            <Input
+              id="kota"
+              data-testid="lead-form-input-kota"
+              value={form.kota}
+              onChange={update("kota")}
+            />
           </div>
 
           {type === "nasabah" ? (
             <>
               <div className="grid gap-1.5">
-                <Label>Alamat Lengkap</Label>
-                <Textarea data-testid="lead-form-input-alamat" value={form.alamat} onChange={update("alamat")} />
+                <Label htmlFor="profesi">Profesi / Pekerjaan</Label>
+                <Input
+                  id="profesi"
+                  data-testid="lead-form-input-profesi"
+                  value={form.profesi}
+                  onChange={update("profesi")}
+                />
               </div>
               <div className="grid gap-1.5">
-                <Label>Produk / Kebutuhan</Label>
-                <Select value={form.produk} onValueChange={(v) => setForm((f) => ({ ...f, produk: v }))}>
-                  <SelectTrigger data-testid="lead-form-select-produk">
-                    <SelectValue>{(v) => (v as string) || "Pilih produk"}</SelectValue>
+                <Label>Apakah Sudah Pernah Trading?</Label>
+                <Select
+                  value={form.pernah_trading}
+                  onValueChange={(v) => setForm((f) => ({ ...f, pernah_trading: v }))}
+                >
+                  <SelectTrigger data-testid="lead-form-select-trading">
+                    <SelectValue>{(v) => (v as string) || "Pilih jawaban"}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {PRODUK_OPTIONS.map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {p}
+                    {TRADING_OPTIONS.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-1.5">
+                <Label>Dari Mana Mengetahui QuickPro?</Label>
+                <Select
+                  value={form.sumber}
+                  onValueChange={(v) => setForm((f) => ({ ...f, sumber: v }))}
+                >
+                  <SelectTrigger data-testid="lead-form-select-sumber">
+                    <SelectValue>{(v) => (v as string) || "Pilih sumber"}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SUMBER_OPTIONS.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -164,13 +263,16 @@ export default function LeadFormDialog({
           ) : (
             <>
               <div className="grid gap-1.5">
-                <Label>Posisi Dilamar</Label>
-                <Select value={form.posisi} onValueChange={(v) => setForm((f) => ({ ...f, posisi: v }))}>
-                  <SelectTrigger data-testid="lead-form-select-posisi">
-                    <SelectValue>{(v) => (v as string) || "Pilih posisi"}</SelectValue>
+                <Label>Pendidikan Terakhir</Label>
+                <Select
+                  value={form.pendidikan}
+                  onValueChange={(v) => setForm((f) => ({ ...f, pendidikan: v }))}
+                >
+                  <SelectTrigger data-testid="lead-form-select-pendidikan">
+                    <SelectValue>{(v) => (v as string) || "Pilih pendidikan"}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {POSISI_OPTIONS.map((p) => (
+                    {PENDIDIKAN_OPTIONS.map((p) => (
                       <SelectItem key={p} value={p}>
                         {p}
                       </SelectItem>
@@ -178,34 +280,44 @@ export default function LeadFormDialog({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="grid gap-1.5">
-                  <Label>NIK (16 Digit)</Label>
-                  <Input data-testid="lead-form-input-nik" value={form.nik} onChange={update("nik")} />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label>Tanggal Lahir</Label>
-                  <Input type="date" data-testid="lead-form-input-tanggal-lahir" value={form.tanggal_lahir} onChange={update("tanggal_lahir")} />
+              <div className="grid gap-1.5">
+                <Label>Upload CV (PDF, maks 5 MB)</Label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/pdf"
+                  data-testid="lead-form-cv-input"
+                  onChange={(e) => handleCvChange(e.target.files?.[0])}
+                  className="hidden"
+                />
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    data-testid="lead-form-cv-button"
+                    disabled={uploading}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {uploading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <FileUp className="h-4 w-4" />
+                    )}
+                    {uploading ? "Mengunggah..." : "Pilih File CV"}
+                  </Button>
+                  {cv && (
+                    <span
+                      data-testid="lead-form-cv-filename"
+                      className="flex items-center gap-1.5 text-xs text-[#0F766E]"
+                    >
+                      <Paperclip className="h-3.5 w-3.5" />
+                      {cv.filename}
+                    </span>
+                  )}
                 </div>
               </div>
             </>
           )}
-
-          <div className="grid gap-1.5">
-            <Label>Sumber Leads</Label>
-            <Select value={form.sumber} onValueChange={(v) => setForm((f) => ({ ...f, sumber: v }))}>
-              <SelectTrigger data-testid="lead-form-select-sumber">
-                <SelectValue>{(v) => (v as string) || "Pilih sumber"}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {sumberOptions.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
 
           <div className="grid gap-1.5">
             <Label>Tanggal Follow Up</Label>
@@ -226,9 +338,7 @@ export default function LeadFormDialog({
               >
                 <SelectTrigger data-testid="lead-form-select-assign">
                   <SelectValue>
-                    {(v) =>
-                      marketingList?.find((m) => m.id === v)?.name || "Belum ditugaskan"
-                    }
+                    {(v) => marketingList?.find((m) => m.id === v)?.name || "Belum ditugaskan"}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -244,7 +354,11 @@ export default function LeadFormDialog({
 
           <div className="grid gap-1.5">
             <Label>Catatan Awal</Label>
-            <Textarea data-testid="lead-form-input-catatan" value={form.catatan} onChange={update("catatan")} />
+            <Textarea
+              data-testid="lead-form-input-catatan"
+              value={form.catatan}
+              onChange={update("catatan")}
+            />
           </div>
         </div>
 
@@ -252,7 +366,7 @@ export default function LeadFormDialog({
           <DialogClose render={<Button variant="outline">Batal</Button>} />
           <Button
             data-testid="lead-form-submit-button"
-            disabled={!form.nama || !form.no_hp || !form.sumber || createMutation.isPending}
+            disabled={!canSubmit}
             onClick={() => createMutation.mutate()}
           >
             {createMutation.isPending ? "Menyimpan..." : "Simpan Leads"}

@@ -26,15 +26,20 @@ class NoteCreate(BaseModel):
 class Lead(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     type: Literal["nasabah", "pelamar"]
+    # Shared fields
     nama: str
-    no_hp: str
-    email: Optional[str] = None
-    alamat: Optional[str] = None
-    produk: Optional[str] = None
-    posisi: Optional[str] = None
-    nik: Optional[str] = None
-    tanggal_lahir: Optional[str] = None
-    sumber: str
+    no_wa: str
+    usia: Optional[int] = None
+    kota: Optional[str] = None
+    # Nasabah-only fields
+    profesi: Optional[str] = None
+    pernah_trading: Optional[str] = None  # "Ya" | "Belum"
+    sumber: Optional[str] = None
+    # Pelamar-only fields
+    pendidikan: Optional[str] = None  # SMP | SMA | Diploma | Sarjana
+    cv_file_id: Optional[str] = None
+    cv_filename: Optional[str] = None
+    # Workflow
     status: str
     catatan: Optional[str] = None
     tanggal_follow_up: Optional[str] = None
@@ -50,14 +55,15 @@ class Lead(BaseModel):
 class LeadCreate(BaseModel):
     type: Literal["nasabah", "pelamar"]
     nama: str
-    no_hp: str
-    email: Optional[str] = None
-    alamat: Optional[str] = None
-    produk: Optional[str] = None
-    posisi: Optional[str] = None
-    nik: Optional[str] = None
-    tanggal_lahir: Optional[str] = None
-    sumber: str
+    no_wa: str
+    usia: Optional[int] = None
+    kota: Optional[str] = None
+    profesi: Optional[str] = None
+    pernah_trading: Optional[str] = None
+    sumber: Optional[str] = None
+    pendidikan: Optional[str] = None
+    cv_file_id: Optional[str] = None
+    cv_filename: Optional[str] = None
     status: str = "Baru"
     catatan: Optional[str] = None
     tanggal_follow_up: Optional[str] = None
@@ -66,14 +72,15 @@ class LeadCreate(BaseModel):
 
 class LeadUpdate(BaseModel):
     nama: Optional[str] = None
-    no_hp: Optional[str] = None
-    email: Optional[str] = None
-    alamat: Optional[str] = None
-    produk: Optional[str] = None
-    posisi: Optional[str] = None
-    nik: Optional[str] = None
-    tanggal_lahir: Optional[str] = None
+    no_wa: Optional[str] = None
+    usia: Optional[int] = None
+    kota: Optional[str] = None
+    profesi: Optional[str] = None
+    pernah_trading: Optional[str] = None
     sumber: Optional[str] = None
+    pendidikan: Optional[str] = None
+    cv_file_id: Optional[str] = None
+    cv_filename: Optional[str] = None
     status: Optional[str] = None
     catatan: Optional[str] = None
     tanggal_follow_up: Optional[str] = None
@@ -122,3 +129,15 @@ class TeamPerformance(BaseModel):
     target_deals: int = 0
     achieved_this_month: int = 0
     target_progress: float = 0.0
+
+
+class ImportResult(BaseModel):
+    created: int
+    skipped: int
+    errors: List[str] = []
+
+
+class UploadedFile(BaseModel):
+    file_id: str
+    filename: str
+    size: int

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { FileText, Trash2 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +14,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import StatusBadge from "@/components/StatusBadge";
-import { apiGet, apiPatch, apiPost } from "@/lib/api";
+import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api";
 import {
   NASABAH_STATUSES,
   PELAMAR_STATUSES,
@@ -99,8 +100,7 @@ export default function LeadDetailSheet({
     onError: () => toast.error("Gagal memindahkan leads"),
   });
 
-  const rescheduleMutation = useMutation({
-    mutationFn: () =>
+  const rescheduleMutation = useMutation({    mutationFn: () =>
       apiPatch<Lead>(`/leads/${leadId}`, { tanggal_follow_up: newFollowUp }),
     onSuccess: () => {
       toast.success("Jadwal follow up diperbarui");
@@ -113,10 +113,26 @@ export default function LeadDetailSheet({
     onError: () => toast.error("Gagal memperbarui jadwal follow up"),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: () => apiDelete(`/leads/${leadId}`),
+    onSuccess: () => {
+      toast.success("Leads dihapus");
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      queryClient.invalidateQueries({ queryKey: ["leads-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["team-performance"] });
+      queryClient.invalidateQueries({ queryKey: ["follow-up-notifications"] });
+      onOpenChange(false);
+    },
+    onError: () => toast.error("Gagal menghapus leads — Anda mungkin tidak punya izin"),
+  });
+
   if (!lead) return null;
 
   const statusOptions = lead.type === "nasabah" ? NASABAH_STATUSES : PELAMAR_STATUSES;
   const otherMarketing = marketingList?.filter((m) => m.id !== lead.assigned_to) ?? [];
+  // Admin may delete anything; marketing only the leads they entered themselves.
+  const canDelete =
+    me?.role === "admin" || (lead.created_by === me?.id && lead.assigned_to === me?.id);
 
   return (
     <Sheet open={!!leadId} onOpenChange={onOpenChange}>
@@ -131,19 +147,57 @@ export default function LeadDetailSheet({
             <span className="rounded-full border border-[#E2E8F0] bg-[#F8FAFC] px-2.5 py-0.5 text-[11px] font-medium text-[#475569]">
               {lead.type === "nasabah" ? "Nasabah" : "Pelamar Kerja"}
             </span>
+            {canDelete && (
+              <Button
+                variant="ghost"
+                data-testid="lead-delete-button"
+                disabled={deleteMutation.isPending}
+                onClick={() => {
+                  if (window.confirm(`Hapus leads "${lead.nama}"? Tindakan ini permanen.`)) {
+                    deleteMutation.mutate();
+                  }
+                }}
+                className="ml-auto text-[#BE123C] hover:bg-[#FFE4E6] hover:text-[#9F1239]"
+              >
+                <Trash2 className="h-4 w-4" />
+                Hapus Leads
+              </Button>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4 rounded-xl border border-[#E2E8F0] bg-white p-4">
-            <InfoRow label="No. HP" value={lead.no_hp} />
-            <InfoRow label="Email" value={lead.email} />
-            <InfoRow label="Alamat" value={lead.alamat} />
-            <InfoRow label="Produk" value={lead.produk} />
-            <InfoRow label="Posisi" value={lead.posisi} />
-            <InfoRow label="NIK" value={lead.nik} />
-            <InfoRow label="Tanggal Lahir" value={lead.tanggal_lahir} />
-            <InfoRow label="Sumber Leads" value={lead.sumber} />
+            <InfoRow label="No. WhatsApp" value={lead.no_wa} />
+            <InfoRow label="Usia" value={lead.usia ? `${lead.usia} tahun` : null} />
+            <InfoRow label="Kota Domisili" value={lead.kota} />
+            <InfoRow label="Profesi / Pekerjaan" value={lead.profesi} />
+            <InfoRow label="Pernah Trading" value={lead.pernah_trading} />
+            <InfoRow label="Sumber (Tahu QuickPro)" value={lead.sumber} />
+            <InfoRow label="Pendidikan Terakhir" value={lead.pendidikan} />
             <InfoRow label="Follow Up" value={lead.tanggal_follow_up} />
             <InfoRow label="Ditugaskan ke" value={lead.assigned_to_name ?? "Belum ditugaskan"} />
+            <InfoRow label="Ditambahkan oleh" value={lead.created_by_name} />
+            {lead.cv_file_id && (
+              <div className="col-span-2 flex flex-col gap-1">
+                <span className="text-[11px] uppercase tracking-wide text-[#94A3B8]">
+                  CV Pelamar
+                </span>
+                <a
+                  href={`/api/files/${lead.cv_file_id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  data-testid="lead-cv-link"
+                  className="flex w-fit items-center gap-2 rounded-lg border border-[#BAE6FD] bg-[#E0F2FE] px-3 py-1.5 text-sm font-medium text-[#0369A1] transition-colors duration-200 hover:bg-[#BAE6FD]"
+                >
+                  <FileText className="h-4 w-4" />
+                  {lead.cv_filename ?? "Lihat CV"}
+                </a>
+              </div>
+            )}
+            {lead.catatan && (
+              <div className="col-span-2">
+                <InfoRow label="Catatan Awal" value={lead.catatan} />
+              </div>
+            )}
           </div>
 
           <div className="rounded-xl border border-[#E2E8F0] bg-white p-4">

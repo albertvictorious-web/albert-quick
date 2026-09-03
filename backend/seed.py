@@ -1,8 +1,10 @@
 """Idempotent seed script for QuickPro Leads CRM.
 
 Run with: cd /app/backend && python seed.py
+Add --reset to wipe leads/jadwal/catatan and reseed with the current field structure.
 """
 import asyncio
+import sys
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -30,15 +32,19 @@ async def upsert_user(name, email, password, role):
     return doc
 
 
-async def main():
+async def main(reset: bool = False):
     admin = await upsert_user("Admin QuickPro", "admin@quickpro.id", "admin123", "admin")
     m1 = await upsert_user("Rina Marlina", "rina@quickpro.id", "password123", "marketing")
     m2 = await upsert_user("Budi Santoso", "budi@quickpro.id", "password123", "marketing")
     m3 = await upsert_user("Siti Aminah", "siti@quickpro.id", "password123", "marketing")
 
-    existing_leads = await db.leads.count_documents({})
-    if existing_leads > 0:
-        print("Leads sudah ada, skip seeding leads.")
+    if reset:
+        for name in ("leads", "jadwal", "catatan", "transfers"):
+            await db[name].delete_many({})
+        print("Reset: leads, jadwal, catatan, transfers dikosongkan.")
+
+    if await db.leads.count_documents({}) > 0:
+        print("Leads sudah ada, skip seeding. Gunakan --reset untuk isi ulang.")
         print("Admin login: admin@quickpro.id / admin123")
         return
 
@@ -47,74 +53,156 @@ async def main():
     def days(offset):
         return (today + timedelta(days=offset)).isoformat()
 
-    nasabah_leads = [
-        {"nama": "Ahmad Wijaya", "no_hp": "081234567801", "email": "ahmad.wijaya@gmail.com", "alamat": "Jl. Sudirman No. 12, Jakarta Selatan", "produk": "KPR / Kredit Pemilikan Rumah", "sumber": "Website QuickPro", "status": "Baru", "owner": m1, "follow": days(1)},
-        {"nama": "Dewi Lestari", "no_hp": "081234567802", "email": "dewi.lestari@gmail.com", "alamat": "Jl. Gatot Subroto No. 5, Bandung", "produk": "Deposito Berjangka", "sumber": "Meta Ads (Facebook/IG)", "status": "Diproses", "owner": m1, "follow": days(-1)},
-        {"nama": "Hendra Gunawan", "no_hp": "081234567803", "email": "hendra.g@gmail.com", "alamat": "Jl. Diponegoro No. 8, Surabaya", "produk": "Kredit Usaha Rakyat (KUR)", "sumber": "Referral Sales", "status": "Follow Up", "owner": m1, "follow": days(0)},
-        {"nama": "Maya Puspita", "no_hp": "081234567804", "email": "maya.puspita@gmail.com", "alamat": "Jl. Ahmad Yani No. 20, Semarang", "produk": "Tabungan Bisnis", "sumber": "Walk-in Branch", "status": "Deal", "owner": m1, "follow": None},
-        {"nama": "Rudi Hartono", "no_hp": "081234567805", "email": "rudi.hartono@gmail.com", "alamat": "Jl. Pahlawan No. 3, Medan", "produk": "Kartu Kredit Corporate", "sumber": "Telemarketing", "status": "Gagal", "owner": m1, "follow": None},
-        {"nama": "Sri Wahyuni", "no_hp": "081234567806", "email": "sri.wahyuni@gmail.com", "alamat": "Jl. Merdeka No. 15, Yogyakarta", "produk": "Asuransi / Bancassurance", "sumber": "Pameran / Event", "status": "Baru", "owner": m2, "follow": days(2)},
-        {"nama": "Bambang Setiawan", "no_hp": "081234567807", "email": "bambang.s@gmail.com", "alamat": "Jl. Veteran No. 9, Malang", "produk": "KPR / Kredit Pemilikan Rumah", "sumber": "Website QuickPro", "status": "Diproses", "owner": m2, "follow": days(-2)},
-        {"nama": "Fitriani Ramadhani", "no_hp": "081234567808", "email": "fitriani.r@gmail.com", "alamat": "Jl. Imam Bonjol No. 11, Palembang", "produk": "Deposito Berjangka", "sumber": "Referral Sales", "status": "Follow Up", "owner": m2, "follow": days(0)},
-        {"nama": "Agus Prasetyo", "no_hp": "081234567809", "email": "agus.p@gmail.com", "alamat": "Jl. Kartini No. 7, Makassar", "produk": "Kredit Usaha Rakyat (KUR)", "sumber": "Meta Ads (Facebook/IG)", "status": "Deal", "owner": m2, "follow": None},
-        {"nama": "Yuni Kartika", "no_hp": "081234567810", "email": "yuni.kartika@gmail.com", "alamat": "Jl. Cendrawasih No. 4, Denpasar", "produk": "Tabungan Bisnis", "sumber": "Walk-in Branch", "status": "Baru", "owner": None, "follow": None},
-        {"nama": "Joko Susilo", "no_hp": "081234567811", "email": "joko.susilo@gmail.com", "alamat": "Jl. Diponegoro No. 22, Balikpapan", "produk": "Kartu Kredit Corporate", "sumber": "Telemarketing", "status": "Baru", "owner": None, "follow": None},
+    # type, nama, no_wa, usia, kota, profesi, pernah_trading, sumber, status, owner, follow
+    nasabah = [
+        ("Ahmad Wijaya", "081234567801", 38, "Jakarta Selatan", "Karyawan Swasta", "Belum", "Instagram", "Baru", m1, days(1)),
+        ("Dewi Lestari", "081234567802", 31, "Bandung", "Wirausaha", "Ya", "Facebook", "Diproses", m1, days(-1)),
+        ("Hendra Gunawan", "081234567803", 45, "Surabaya", "Pengusaha Kuliner", "Belum", "YouTube", "Follow Up", m1, days(0)),
+        ("Maya Puspita", "081234567804", 29, "Semarang", "Dokter", "Ya", "Komunitas Trading", "Deal", m1, None),
+        ("Rudi Hartono", "081234567805", 52, "Medan", "Kontraktor", "Belum", "Google", "Gagal", m1, None),
+        ("Sri Wahyuni", "081234567806", 34, "Yogyakarta", "Guru", "Belum", "TikTok", "Baru", m2, days(2)),
+        ("Bambang Setiawan", "081234567807", 41, "Malang", "PNS", "Ya", "Teman/Keluarga", "Diproses", m2, days(-2)),
+        ("Fitriani Ramadhani", "081234567808", 27, "Palembang", "Content Creator", "Belum", "Instagram", "Follow Up", m2, days(0)),
+        ("Agus Prasetyo", "081234567809", 36, "Makassar", "Karyawan BUMN", "Ya", "Referral IB/Partner", "Deal", m2, None),
+        ("Yuni Kartika", "081234567810", 30, "Denpasar", "Pemilik Homestay", "Belum", "Iklan/Ads", "Baru", None, None),
+        ("Joko Susilo", "081234567811", 47, "Balikpapan", "Supervisor Tambang", "Ya", "Komunitas Trading", "Baru", None, None),
     ]
 
-    pelamar_leads = [
-        {"nama": "Andi Saputra", "no_hp": "082234567801", "email": "andi.saputra@gmail.com", "posisi": "Sales Executive", "nik": "3201010101010001", "tanggal_lahir": "1998-03-12", "sumber": "JobStreet", "status": "Baru", "owner": m3, "follow": days(1)},
-        {"nama": "Citra Ayu", "no_hp": "082234567802", "email": "citra.ayu@gmail.com", "posisi": "Marketing Officer", "nik": "3201010101010002", "tanggal_lahir": "1997-07-21", "sumber": "LinkedIn", "status": "Interview", "owner": m3, "follow": days(0)},
-        {"nama": "Doni Kurniawan", "no_hp": "082234567803", "email": "doni.k@gmail.com", "posisi": "Admin Staff", "nik": "3201010101010003", "tanggal_lahir": "1999-11-05", "sumber": "Instagram Career", "status": "Diterima", "owner": m3, "follow": None},
-        {"nama": "Eka Putri", "no_hp": "082234567804", "email": "eka.putri@gmail.com", "posisi": "Digital Marketer", "nik": "3201010101010004", "tanggal_lahir": "2000-01-18", "sumber": "Referral Internal", "status": "Ditolak", "owner": m3, "follow": None},
-        {"nama": "Fajar Nugroho", "no_hp": "082234567805", "email": "fajar.n@gmail.com", "posisi": "Branch Supervisor", "nik": "3201010101010005", "tanggal_lahir": "1995-05-30", "sumber": "Website Karir", "status": "Baru", "owner": m1, "follow": days(-1)},
-        {"nama": "Gita Permata", "no_hp": "082234567806", "email": "gita.permata@gmail.com", "posisi": "Customer Service", "nik": "3201010101010006", "tanggal_lahir": "2001-09-09", "sumber": "Bursa Kerja / Job Fair", "status": "Interview", "owner": m1, "follow": days(0)},
-        {"nama": "Hadi Firmansyah", "no_hp": "082234567807", "email": "hadi.f@gmail.com", "posisi": "Sales Executive", "nik": "3201010101010007", "tanggal_lahir": "1996-12-25", "sumber": "JobStreet", "status": "Diterima", "owner": m2, "follow": None},
-        {"nama": "Indah Sari", "no_hp": "082234567808", "email": "indah.sari@gmail.com", "posisi": "Marketing Officer", "nik": "3201010101010008", "tanggal_lahir": "1998-06-14", "sumber": "LinkedIn", "status": "Baru", "owner": m2, "follow": days(2)},
-        {"nama": "Kevin Halim", "no_hp": "082234567809", "email": "kevin.halim@gmail.com", "posisi": "Admin Staff", "nik": "3201010101010009", "tanggal_lahir": "1999-02-28", "sumber": "Instagram Career", "status": "Ditolak", "owner": None, "follow": None},
-        {"nama": "Lina Marlina", "no_hp": "082234567810", "email": "lina.marlina@gmail.com", "posisi": "Digital Marketer", "nik": "3201010101010010", "tanggal_lahir": "2000-04-17", "sumber": "Website Karir", "status": "Baru", "owner": None, "follow": None},
+    # nama, no_wa, usia, kota, pendidikan, status, owner, follow
+    pelamar = [
+        ("Andi Saputra", "082234567801", 26, "Jakarta Timur", "Sarjana", "Baru", m3, days(1)),
+        ("Citra Ayu", "082234567802", 24, "Bandung", "Diploma", "Interview", m3, days(0)),
+        ("Doni Kurniawan", "082234567803", 23, "Bekasi", "SMA", "Diterima", m3, None),
+        ("Eka Putri", "082234567804", 22, "Tangerang", "SMA", "Ditolak", m3, None),
+        ("Fajar Nugroho", "082234567805", 29, "Depok", "Sarjana", "Baru", m1, days(-1)),
+        ("Gita Permata", "082234567806", 21, "Bogor", "SMP", "Interview", m1, days(0)),
+        ("Hadi Firmansyah", "082234567807", 28, "Surabaya", "Sarjana", "Diterima", m2, None),
+        ("Indah Sari", "082234567808", 25, "Semarang", "Diploma", "Baru", m2, days(2)),
+        ("Kevin Halim", "082234567809", 24, "Medan", "SMA", "Ditolak", None, None),
+        ("Lina Marlina", "082234567810", 23, "Makassar", "Diploma", "Baru", None, None),
     ]
 
-    def build_lead(data, lead_type):
-        owner = data.pop("owner")
-        follow = data.pop("follow")
-        created_at = now_utc()
+    docs = []
+    for nama, no_wa, usia, kota, profesi, trading, sumber, status, owner, follow in nasabah:
+        created = now_utc()
         notes = []
-        if data["status"] != "Baru":
+        if status != "Baru":
             notes.append(
                 {
                     "id": str(uuid.uuid4()),
-                    "text": f"Status diperbarui menjadi {data['status']} oleh sistem seed data.",
-                    "status": data["status"],
+                    "text": f"Status diperbarui menjadi {status} (data contoh).",
+                    "status": status,
                     "created_by": (owner or admin)["id"],
                     "created_by_name": (owner or admin)["name"],
-                    "created_at": created_at,
+                    "created_at": created,
                 }
             )
-        return {
-            "id": str(uuid.uuid4()),
-            "type": lead_type,
-            "sumber": data["sumber"],
-            "status": data["status"],
-            "catatan": None,
-            "tanggal_follow_up": follow,
-            "assigned_to": owner["id"] if owner else None,
-            "assigned_to_name": owner["name"] if owner else None,
-            "created_by": admin["id"],
-            "created_by_name": admin["name"],
-            "created_at": created_at,
-            "updated_at": created_at,
-            "notes": notes,
-            **{k: v for k, v in data.items() if k not in ("sumber", "status")},
-        }
+        docs.append(
+            {
+                "id": str(uuid.uuid4()),
+                "type": "nasabah",
+                "nama": nama,
+                "no_wa": no_wa,
+                "usia": usia,
+                "kota": kota,
+                "profesi": profesi,
+                "pernah_trading": trading,
+                "sumber": sumber,
+                "pendidikan": None,
+                "cv_file_id": None,
+                "cv_filename": None,
+                "status": status,
+                "catatan": None,
+                "tanggal_follow_up": follow,
+                "assigned_to": owner["id"] if owner else None,
+                "assigned_to_name": owner["name"] if owner else None,
+                "created_by": admin["id"],
+                "created_by_name": admin["name"],
+                "created_at": created,
+                "updated_at": created,
+                "closed_at": created if status in ("Deal", "Diterima") else None,
+                "notes": notes,
+            }
+        )
 
-    docs = [build_lead(d, "nasabah") for d in nasabah_leads] + [
-        build_lead(d, "pelamar") for d in pelamar_leads
-    ]
+    for nama, no_wa, usia, kota, pendidikan, status, owner, follow in pelamar:
+        created = now_utc()
+        notes = []
+        if status != "Baru":
+            notes.append(
+                {
+                    "id": str(uuid.uuid4()),
+                    "text": f"Status diperbarui menjadi {status} (data contoh).",
+                    "status": status,
+                    "created_by": (owner or admin)["id"],
+                    "created_by_name": (owner or admin)["name"],
+                    "created_at": created,
+                }
+            )
+        docs.append(
+            {
+                "id": str(uuid.uuid4()),
+                "type": "pelamar",
+                "nama": nama,
+                "no_wa": no_wa,
+                "usia": usia,
+                "kota": kota,
+                "profesi": None,
+                "pernah_trading": None,
+                "sumber": None,
+                "pendidikan": pendidikan,
+                "cv_file_id": None,
+                "cv_filename": None,
+                "status": status,
+                "catatan": None,
+                "tanggal_follow_up": follow,
+                "assigned_to": owner["id"] if owner else None,
+                "assigned_to_name": owner["name"] if owner else None,
+                "created_by": admin["id"],
+                "created_by_name": admin["name"],
+                "created_at": created,
+                "updated_at": created,
+                "closed_at": created if status in ("Deal", "Diterima") else None,
+                "notes": notes,
+            }
+        )
+
     await db.leads.insert_many(docs)
-    print(f"Seeded {len(docs)} leads.")
+
+    # A couple of prospecting appointments so the new menu is not empty on first open.
+    jadwal_rows = [
+        (m1, "Ahmad Wijaya", "Kantor Pusat, Jakarta Selatan", days(1), "10:00", "Mobil Pribadi", "Terjadwal", None),
+        (m1, "Hendra Gunawan", "Cafe Tunjungan, Surabaya", days(0), "14:30", "Transportasi Online", "Terjadwal", None),
+        (m2, "Bambang Setiawan", "Rumah Klien, Malang", days(-1), "09:00", "Motor", "Selesai", "Klien tertarik, minta simulasi profit dulu sebelum deposit."),
+    ]
+    jadwal_docs = []
+    for owner, client, lokasi, tanggal, jam, kendaraan, status, hasil in jadwal_rows:
+        created = now_utc()
+        jadwal_docs.append(
+            {
+                "id": str(uuid.uuid4()),
+                "client_nama": client,
+                "marketing_id": owner["id"],
+                "marketing_name": owner["name"],
+                "lokasi": lokasi,
+                "tanggal": tanggal,
+                "jam": jam,
+                "kendaraan": kendaraan,
+                "status": status,
+                "hasil_pertemuan": hasil,
+                "lead_id": None,
+                "created_by": owner["id"],
+                "created_by_name": owner["name"],
+                "created_at": created,
+                "updated_at": created,
+            }
+        )
+    await db.jadwal.insert_many(jadwal_docs)
+
+    print(f"Seeded {len(docs)} leads dan {len(jadwal_docs)} jadwal prospek.")
     print("Admin login: admin@quickpro.id / admin123")
-    print("Marketing login: rina@quickpro.id / password123 (dan lainnya) / password123")
+    print("Marketing login: rina@quickpro.id / budi@quickpro.id / siti@quickpro.id — password123")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main(reset="--reset" in sys.argv))

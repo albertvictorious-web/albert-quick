@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Users, Download, Shuffle } from "lucide-react";
+import { Plus, Search, Users, Download, Shuffle, Upload } from "lucide-react";
 import { toast } from "sonner";
 import AppShell from "@/components/AppShell";
 import ProtectedRoute, { useMe } from "@/components/ProtectedRoute";
@@ -8,6 +8,7 @@ import StatusBadge from "@/components/StatusBadge";
 import LeadFormDialog from "@/components/LeadFormDialog";
 import LeadDetailSheet from "@/components/LeadDetailSheet";
 import AutoDistributeDialog from "@/components/AutoDistributeDialog";
+import ImportLeadsDialog from "@/components/ImportLeadsDialog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -39,6 +40,7 @@ function LeadsContent() {
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [autoOpen, setAutoOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [activeLeadId, setActiveLeadId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkAssignTo, setBulkAssignTo] = useState("");
@@ -133,6 +135,16 @@ function LeadsContent() {
           {isAdmin && (
             <Button
               variant="outline"
+              data-testid="open-import-leads-button"
+              onClick={() => setImportOpen(true)}
+            >
+              <Upload className="h-4 w-4" />
+              Upload CSV
+            </Button>
+          )}
+          {isAdmin && (
+            <Button
+              variant="outline"
               data-testid="open-auto-distribute-button"
               onClick={() => setAutoOpen(true)}
             >
@@ -170,7 +182,7 @@ function LeadsContent() {
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
           <Input
             data-testid="leads-search-input"
-            placeholder="Cari nama, no. HP, atau email..."
+            placeholder="Cari nama, no. WhatsApp, atau kota..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -287,8 +299,9 @@ function LeadsContent() {
                 </TableHead>
               )}
               <TableHead>Nama</TableHead>
-              <TableHead>Kontak</TableHead>
-              <TableHead>{type === "nasabah" ? "Produk" : "Posisi"}</TableHead>
+              <TableHead>No. WhatsApp</TableHead>
+              <TableHead>Usia / Kota</TableHead>
+              <TableHead>{type === "nasabah" ? "Profesi" : "Pendidikan"}</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Follow Up</TableHead>
               <TableHead>Marketing</TableHead>
@@ -297,14 +310,14 @@ function LeadsContent() {
           <TableBody>
             {isLoading && (
               <TableRow>
-                <TableCell colSpan={isAdmin ? 7 : 6} className="py-8 text-center text-sm text-[#94A3B8]">
+                <TableCell colSpan={isAdmin ? 8 : 7} className="py-8 text-center text-sm text-[#94A3B8]">
                   Memuat data...
                 </TableCell>
               </TableRow>
             )}
             {!isLoading && rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={isAdmin ? 7 : 6} className="py-8 text-center text-sm text-[#94A3B8]">
+                <TableCell colSpan={isAdmin ? 8 : 7} className="py-8 text-center text-sm text-[#94A3B8]">
                   Belum ada leads yang cocok dengan filter.
                 </TableCell>
               </TableRow>
@@ -332,9 +345,13 @@ function LeadsContent() {
                     </TableCell>
                   )}
                   <TableCell className="font-medium text-[#0F172A]">{lead.nama}</TableCell>
-                  <TableCell className="text-[#475569]">{lead.no_hp}</TableCell>
+                  <TableCell className="text-[#475569]">{lead.no_wa}</TableCell>
                   <TableCell className="text-[#475569]">
-                    {type === "nasabah" ? lead.produk : lead.posisi}
+                    {[lead.usia ? `${lead.usia} th` : null, lead.kota].filter(Boolean).join(" · ") ||
+                      "-"}
+                  </TableCell>
+                  <TableCell className="text-[#475569]">
+                    {(type === "nasabah" ? lead.profesi : lead.pendidikan) ?? "-"}
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={lead.status} />
@@ -360,6 +377,7 @@ function LeadsContent() {
 
       <LeadFormDialog open={formOpen} onOpenChange={setFormOpen} defaultType={type} />
       <AutoDistributeDialog open={autoOpen} onOpenChange={setAutoOpen} leadType={type} />
+      <ImportLeadsDialog open={importOpen} onOpenChange={setImportOpen} />
       <LeadDetailSheet leadId={activeLeadId} onOpenChange={(open) => !open && setActiveLeadId(null)} />
     </div>
   );

@@ -24,14 +24,15 @@ export interface Lead {
   id: string;
   type: LeadType;
   nama: string;
-  no_hp: string;
-  email?: string | null;
-  alamat?: string | null;
-  produk?: string | null;
-  posisi?: string | null;
-  nik?: string | null;
-  tanggal_lahir?: string | null;
-  sumber: string;
+  no_wa: string;
+  usia?: number | null;
+  kota?: string | null;
+  profesi?: string | null;
+  pernah_trading?: string | null;
+  sumber?: string | null;
+  pendidikan?: string | null;
+  cv_file_id?: string | null;
+  cv_filename?: string | null;
   status: string;
   catatan?: string | null;
   tanggal_follow_up?: string | null;
@@ -43,6 +44,75 @@ export interface Lead {
   updated_at: string;
   notes: ProgressNote[];
 }
+
+// Mirrors ImportResult in backend/models/lead.py
+export interface ImportResult {
+  created: number;
+  skipped: number;
+  errors: string[];
+}
+
+// Mirrors UploadedFile in backend/models/lead.py
+export interface UploadedFile {
+  file_id: string;
+  filename: string;
+  size: number;
+}
+
+// Mirrors Catatan in backend/models/ops.py
+export interface Catatan {
+  id: string;
+  user_id: string;
+  user_name: string;
+  title: string;
+  body: string;
+  lead_id?: string | null;
+  lead_nama?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Mirrors Jadwal in backend/models/ops.py
+export interface Jadwal {
+  id: string;
+  client_nama: string;
+  marketing_id: string;
+  marketing_name: string;
+  lokasi: string;
+  tanggal: string;
+  jam: string;
+  kendaraan: string;
+  status: string;
+  hasil_pertemuan?: string | null;
+  lead_id?: string | null;
+  created_by: string;
+  created_by_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export const SUMBER_OPTIONS = [
+  "Instagram",
+  "Facebook",
+  "YouTube",
+  "TikTok",
+  "Google",
+  "Teman/Keluarga",
+  "Komunitas Trading",
+  "Iklan/Ads",
+  "Referral IB/Partner",
+];
+
+export const PENDIDIKAN_OPTIONS = ["SMP", "SMA", "Diploma", "Sarjana"];
+export const TRADING_OPTIONS = ["Ya", "Belum"];
+export const KENDARAAN_OPTIONS = [
+  "Mobil Pribadi",
+  "Motor",
+  "Kendaraan Kantor",
+  "Transportasi Online",
+  "Lainnya",
+];
+export const JADWAL_STATUSES = ["Terjadwal", "Selesai", "Dibatalkan"];
 
 export interface LeadStats {
   total: number;
@@ -125,42 +195,6 @@ export const TERMINAL_STATUSES = ["Deal", "Gagal", "Diterima", "Ditolak"];
 
 export const NASABAH_STATUSES = ["Baru", "Diproses", "Follow Up", "Deal", "Gagal"] as const;
 export const PELAMAR_STATUSES = ["Baru", "Interview", "Diterima", "Ditolak"] as const;
-
-export const PRODUK_OPTIONS = [
-  "KPR / Kredit Pemilikan Rumah",
-  "Deposito Berjangka",
-  "Tabungan Bisnis",
-  "Kredit Usaha Rakyat (KUR)",
-  "Kartu Kredit Corporate",
-  "Asuransi / Bancassurance",
-];
-
-export const SUMBER_NASABAH_OPTIONS = [
-  "Website QuickPro",
-  "Meta Ads (Facebook/IG)",
-  "Referral Sales",
-  "Walk-in Branch",
-  "Telemarketing",
-  "Pameran / Event",
-];
-
-export const POSISI_OPTIONS = [
-  "Sales Executive",
-  "Marketing Officer",
-  "Admin Staff",
-  "Digital Marketer",
-  "Branch Supervisor",
-  "Customer Service",
-];
-
-export const SUMBER_PELAMAR_OPTIONS = [
-  "JobStreet",
-  "LinkedIn",
-  "Instagram Career",
-  "Referral Internal",
-  "Website Karir",
-  "Bursa Kerja / Job Fair",
-];
 
 export const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }> = {
   Baru: { bg: "#E0F2FE", text: "#0369A1", border: "#BAE6FD" },
