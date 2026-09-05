@@ -1,13 +1,19 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
   "installCommand": "yarn --cwd frontend install --frozen-lockfile",
   "buildCommand": "yarn --cwd frontend build",
   "outputDirectory": "frontend/dist",
   "regions": ["sin1"],
   "functions": {
     "api/index.py": {
-      "includeFiles": "backend/**",
-      "excludeFiles": "backend/{tests/**,**/__pycache__/**,pytest.ini,.env}",
+      "includeFiles": ["backend/**"],
+      "excludeFiles": [
+        "backend/tests/**",
+        "backend/**/__pycache__/**",
+        "backend/pytest.ini",
+        "backend/.env"
+      ],
       "maxDuration": 60
     }
   },
