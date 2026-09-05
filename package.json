@@ -1,0 +1,19 @@
+{
+  "name": "albert-quick",
+  "version": "1.0.0",
+  "private": true,
+  "description": "QuickPro Leads CRM - FastAPI + React di satu project Vercel, database MongoDB Atlas",
+  "comment": "Berkas ini ada agar Root Directory di Vercel bisa diset './' (root repo). Vercel mendeteksi jenis project dari package.json di Root Directory; tanpa berkas ini, deteksi jatuh ke 'Other' dan langkah install bisa dilewati sehingga build frontend gagal. Root Directory WAJIB './' karena hanya dari root Vercel bisa melihat folder api/ dan backend/ sekaligus frontend/. Kalau Root Directory diset ke 'frontend', fungsi Python tidak ikut ter-deploy dan /api/* akan membalas HTML. Semua perintah build sesungguhnya didelegasikan ke frontend/ dan didefinisikan di vercel.json.",
+  "scripts": {
+    "install:frontend": "yarn --cwd frontend install --frozen-lockfile",
+    "build": "yarn --cwd frontend build",
+    "dev": "yarn --cwd frontend dev",
+    "start": "yarn --cwd frontend start",
+    "typecheck": "yarn --cwd frontend typecheck",
+    "lint": "yarn --cwd frontend lint"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "yarn@1.22.22"
+}

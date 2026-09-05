@@ -56,11 +56,24 @@ git push origin main
 ### 2. Import project di Vercel
 
 1. [vercel.com/new](https://vercel.com/new) → pilih repo `albert-quick`
-2. **Root Directory: biarkan kosong (root repo).**
-   Ini kesalahan paling sering: kalau di-set ke `frontend`, Vercel tidak akan
-   melihat folder `api/` dan `backend/`, sehingga `/api/*` membalas HTML.
-3. Framework Preset: **Other**. `vercel.json` sudah menentukan build sendiri,
-   jadi jangan isi Build/Output Directory secara manual.
+2. **Root Directory: `./` (root repository).**
+   Ini kesalahan paling sering dan paling menyesatkan. Kalau diarahkan ke
+   `frontend`, folder `api/` dan `backend/` berada di luar jangkauan build:
+   fungsi Python tidak ikut ter-deploy, dan `/api/*` justru membalas
+   `index.html`. Frontend tampak normal, tapi semua pemanggilan API gagal
+   dengan error parsing JSON.
+3. Framework Preset: **Other**. Jangan mengisi Build Command dan Output
+   Directory lewat UI — keduanya sudah ditentukan `vercel.json`, dan nilai di
+   UI akan menimpanya secara diam-diam.
+
+Susunan yang membuat Root Directory `./` bekerja:
+
+| Berkas | Peran |
+|---|---|
+| `package.json` (root) | Membuat Vercel mengenali project di root dan menjalankan langkah install. Tanpa berkas ini deteksi jatuh ke "Other" dan install bisa terlewat sehingga build frontend gagal. Tidak punya dependency sendiri — semua script mendelegasikan ke `frontend/` |
+| `vercel.json` | `installCommand`/`buildCommand` menunjuk ke `frontend/`; `outputDirectory` = `frontend/dist`, relatif terhadap root |
+| `requirements.txt` (root) | Manifest Python. Vercel mencarinya di Root Directory, bukan di `backend/` |
+| `api/index.py` | Titik masuk Function, terdeteksi karena berada di `api/` pada Root Directory |
 
 ### 3. Isi Environment Variables
 
@@ -177,7 +190,7 @@ python seed.py --reset    # hapus leads/jadwal/catatan lalu isi ulang
 
 | Gejala | Penyebab & solusi |
 |---|---|
-| `/api/health` membalas HTML | Root Directory di-set ke `frontend`. Kosongkan |
+| `/api/health` membalas HTML | Root Directory bukan `./`. Kemungkinan diarahkan ke `frontend`, sehingga `api/` dan `backend/` tidak ikut ter-deploy |
 | `/api/*` → 404 semua | Prefix `/api` di `APIRouter` terhapus. Rewrite bersifat identitas, fungsi menerima path lengkap `/api/...` — prefix harus dipertahankan |
 | `ModuleNotFoundError: server` | `includeFiles: "backend/**"` hilang dari `vercel.json` |
 | `mongo: unreachable` di `/api/health` | `MONGO_URL` salah / password belum di-URL-encode / Network Access Atlas belum `0.0.0.0/0` |

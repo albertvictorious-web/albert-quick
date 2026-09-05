@@ -1,0 +1,146 @@
+# Memeriksa identitas author setiap commit sebelum sampai ke Vercel.
+#
+# ===========================================================================
+#  BERKAS INI BELUM AKTIF. Aktifkan dengan memindahkannya:
+#
+#      mkdir -p .github/workflows
+#      git mv .github/commit-identity.workflow.yml \
+#             .github/workflows/commit-identity.yml
+#      git commit -m "Aktifkan pemeriksaan identitas commit"
+#      git push
+#
+#  Kenapa tidak langsung ditaruh di .github/workflows/: GitHub menolak push
+#  berkas workflow dari Personal Access Token yang tidak memiliki scope
+#  "workflow". Karena itu berkasnya disimpan di sini lebih dulu, lengkap dan
+#  siap pakai, agar isinya tidak hilang.
+#
+#  Dua cara mengaktifkannya:
+#    a. Buat PAT baru dengan scope "workflow" (atau centang Workflows: Write
+#       pada fine-grained token), lalu jalankan perintah di atas
+#    b. Buat berkasnya lewat GitHub web: Actions -> new workflow ->
+#       set up a workflow yourself -> tempel isi berkas ini
+# ===========================================================================
+#
+# Vercel menolak deployment bila email author sebuah commit tidak bisa
+# dicocokkan ke akun GitHub. Tanpa pemeriksaan ini, kesalahannya baru terlihat
+# saat deployment gagal — setelah review dan merge selesai. Workflow ini
+# memindahkan kegagalan itu ke PR, tempat yang masih murah untuk diperbaiki.
+#
+# Ini jaring terakhir: tetap berjalan walaupun kontributor atau AI agent
+# melewatkan .gitconfig dan hook pre-commit di mesinnya.
+
+name: Commit Identity
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    name: Email author cocok dengan akun GitHub
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout beserta riwayat
+        uses: actions/checkout@v4
+        with:
+          # Butuh riwayat penuh agar rentang commit PR bisa dihitung.
+          fetch-depth: 0
+
+      - name: Periksa email author dan committer
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -uo pipefail
+
+          if [ -n "${BASE_SHA:-}" ]; then
+            RANGE="$BASE_SHA..$HEAD_SHA"
+            echo "Memeriksa commit pada PR: $RANGE"
+          else
+            RANGE="-1 HEAD"
+            echo "Memeriksa commit terakhir pada push"
+          fi
+
+          # Pola email yang pasti bukan akun GitHub.
+          BLOCKED='@emergent\.sh$|^bot@|@anthropic\.com$|@openai\.com$|@example\.com$|@localhost$|^root@|@\(none\)$'
+
+          FAILED=0
+
+          while IFS='|' read -r sha an ae cn ce; do
+            [ -z "${sha:-}" ] && continue
+            for pair in "author:$an:$ae" "committer:$cn:$ce"; do
+              role="${pair%%:*}"
+              rest="${pair#*:}"
+              name="${rest%%:*}"
+              email="${rest#*:}"
+
+              if printf '%s' "$email" | grep -qiE "$BLOCKED"; then
+                echo "::error::commit $sha — email $role tidak bisa dicocokkan ke akun GitHub: $name <$email>"
+                FAILED=1
+                continue
+              fi
+
+              if ! printf '%s' "$email" | grep -qE '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'; then
+                echo "::error::commit $sha — email $role tidak berbentuk alamat sah: '$email'"
+                FAILED=1
+                continue
+              fi
+
+              echo "ok  $sha  $role  $name <$email>"
+            done
+          done < <(git log --format='%H|%an|%ae|%cn|%ce' $RANGE)
+
+          if [ "$FAILED" -ne 0 ]; then
+            cat <<'MSG'
+
+          ==========================================================
+           Deployment Vercel akan diblokir oleh commit di atas.
+
+           Perbaiki identitasnya:
+
+             git config --local user.name  "albertvictorious-web"
+             git config --local user.email "324408409+albertvictorious-web@users.noreply.github.com"
+
+           Lalu tulis ulang commit yang sudah ada:
+
+             FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch -f --env-filter '
+               export GIT_AUTHOR_NAME="albertvictorious-web"
+               export GIT_AUTHOR_EMAIL="324408409+albertvictorious-web@users.noreply.github.com"
+               export GIT_COMMITTER_NAME="albertvictorious-web"
+               export GIT_COMMITTER_EMAIL="324408409+albertvictorious-web@users.noreply.github.com"
+             ' origin/main..HEAD
+
+             git push --force-with-lease
+
+           Selengkapnya: AGENTS.md bagian 1.
+          ==========================================================
+
+MSG
+            exit 1
+          fi
+
+          echo ""
+          echo "Semua commit memakai email yang bisa dicocokkan ke akun GitHub."
+
+      - name: Pastikan tidak ada kredensial yang ter-commit
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -uo pipefail
+
+          if [ -n "${BASE_SHA:-}" ]; then
+            DIFF="$(git diff "$BASE_SHA" "$HEAD_SHA")"
+          else
+            DIFF="$(git show HEAD)"
+          fi
+
+          PATTERN='mongodb\+srv://[A-Za-z0-9._%+-]+:[^@[:space:]"]+@|github_pat_[A-Za-z0-9_]{20,}|ghp_[A-Za-z0-9]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|AKIA[0-9A-Z]{16}'
+
+          if printf '%s' "$DIFF" | grep -qE "$PATTERN"; then
+            echo "::error::Terdeteksi kemungkinan kredensial pada perubahan ini. Pindahkan ke Environment Variables."
+            exit 1
+          fi
+
+          echo "Tidak ada kredensial terdeteksi."
