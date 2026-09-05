@@ -84,6 +84,13 @@ async def health():
         "env": os.environ.get("VERCEL_ENV", "local"),
         "region": os.environ.get("VERCEL_REGION", "local"),
         "cookie_secure": cookie_is_secure(),
+        # Nama variabel saja, nilainya TIDAK pernah dikembalikan. Ini yang
+        # membedakan "env var belum di-set di Vercel" dari "kredensial salah" —
+        # dua penyebab yang gejalanya sama-sama "tidak bisa login".
+        "env_vars": {
+            name: ("set" if os.environ.get(name, "").strip() else "MISSING")
+            for name in ("MONGO_URL", "DB_NAME", "SECRET_KEY")
+        },
         "runtime": {
             "python": platform.python_version(),
             "fastapi": version("fastapi"),
@@ -94,11 +101,24 @@ async def health():
     try:
         await db.command("ping")
         payload["mongo"] = "connected"
+        payload["users"] = await db.users.count_documents({})
+        payload["leads"] = await db.leads.count_documents({})
     except Exception as exc:  # noqa: BLE001 - pesan diagnostik sengaja diteruskan
         payload["status"] = "degraded"
         payload["mongo"] = "unreachable"
         payload["error"] = f"{type(exc).__name__}: {exc}"[:300]
         return JSONResponse(status_code=503, content=payload)
+
+    # users == 0 berarti Function tersambung ke database yang SALAH atau kosong.
+    # Ini penyebab paling sering dari "tidak bisa login pakai akun default":
+    # kredensialnya benar, tapi DB_NAME di Vercel berbeda dari yang di-seed.
+    if payload["users"] == 0:
+        payload["status"] = "degraded"
+        payload["hint"] = (
+            f"Database '{db_name()}' tidak punya user sama sekali. Login apa pun "
+            "akan gagal dengan 'Email atau password salah'. Periksa DB_NAME dan "
+            "MONGO_URL di Environment Variables Vercel, lalu jalankan seed."
+        )
 
     payload["latency_ms"] = round((time.perf_counter() - started) * 1000, 1)
     return payload

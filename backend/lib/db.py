@@ -50,8 +50,22 @@ CLIENT_OPTIONS: Dict[str, Any] = {
 _clients: Dict[int, AsyncIOMotorClient] = {}
 
 
+def _clean(value: str) -> str:
+    """Buang spasi dan tanda kutip yang ikut ter-paste.
+
+    Di UI Vercel, nilai environment variable disimpan apa adanya. Menempel
+    `MONGO_URL="mongodb+srv://..."` dari berkas .env membuat tanda kutipnya
+    menjadi bagian dari nilai, dan koneksi gagal dengan pesan yang tidak
+    menyinggung tanda kutip sama sekali. Lebih murah dibersihkan di sini.
+    """
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+        value = value[1:-1].strip()
+    return value
+
+
 def _mongo_url() -> str:
-    url = os.environ.get("MONGO_URL", "").strip()
+    url = _clean(os.environ.get("MONGO_URL", ""))
     if not url:
         raise RuntimeError(
             "MONGO_URL belum di-set. Di Vercel: Project Settings -> Environment "
@@ -61,7 +75,7 @@ def _mongo_url() -> str:
 
 
 def db_name() -> str:
-    return os.environ.get("DB_NAME", "").strip() or DEFAULT_DB_NAME
+    return _clean(os.environ.get("DB_NAME", "")) or DEFAULT_DB_NAME
 
 
 def _loop_key() -> int:

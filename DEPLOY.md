@@ -314,6 +314,10 @@ python seed.py --reset    # hapus leads/jadwal/catatan lalu isi ulang
 | `ModuleNotFoundError: server` | `includeFiles: "backend/**"` hilang dari `vercel.json` |
 | `ModuleNotFoundError: No module named 'fastapi'` (build sukses, Function 500) | `"framework": null` hilang dari `vercel.json`. `installCommand` custom menggantikan langkah install Python, dan deteksi framework FastAPI merebut routing `api/`. Lihat bagian `"framework": null` di atas |
 | `ModuleNotFoundError` untuk paket lain | Paket belum ada di `requirements.txt` **root**. `backend/requirements.txt` tidak dipakai Vercel |
+| Tidak bisa login pakai akun default (`admin@quickpro.id` / `admin123`) | Panggil `/api/health` dulu, jangan menebak. `env_vars` menunjukkan variabel yang `MISSING`; `users: 0` berarti Function tersambung ke database yang salah atau kosong sehingga login apa pun balas "Email atau password salah"; `mongo: unreachable` berarti koneksi Atlas gagal. Kalau `users: 4` tapi login tetap gagal, `SECRET_KEY` kemungkinan belum di-set untuk environment yang dipakai |
+| Login balas `500` | `SECRET_KEY` belum di-set. Aplikasi sengaja gagal keras di Vercel daripada menandatangani sesi dengan kunci publik. Cek `env_vars.SECRET_KEY` di `/api/health` |
+| Env var sudah di-set tapi tetap gagal | Nilainya mungkin ter-paste **beserta tanda kutip** dari berkas `.env`. Di UI Vercel nilai disimpan apa adanya, jadi isi tanpa tanda kutip. `MONGO_URL`, `DB_NAME`, dan `SECRET_KEY` kini dibersihkan otomatis dari kutipan, tapi variabel lain tidak |
+| Env var sudah benar tapi belum berpengaruh | Environment Variables hanya terbaca oleh deployment **baru**. Setelah menyimpan, jalankan Redeploy |
 | `mongo: unreachable` di `/api/health` | `MONGO_URL` salah / password belum di-URL-encode / Network Access Atlas belum `0.0.0.0/0` |
 | `bad auth: authentication failed` | User database yang dipakai di `MONGO_URL` salah, atau password belum di-URL-encode. Verifikasi user di Atlas → Database Access |
 | Login sukses tapi langsung ter-logout | `SECRET_KEY` berbeda antar deployment, atau belum di-set di environment yang dipakai |

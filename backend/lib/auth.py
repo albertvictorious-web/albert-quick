@@ -27,6 +27,8 @@ def _is_serverless_production() -> bool:
 
 def get_secret_key() -> str:
     key = os.environ.get("SECRET_KEY", "").strip()
+    if len(key) >= 2 and key[0] == key[-1] and key[0] in "\"'":
+        key = key[1:-1].strip()  # tanda kutip ikut ter-paste di UI Vercel
     if key:
         return key
     if _is_serverless_production():
