@@ -5,11 +5,13 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Response
 
 from lib.auth import (
+    COOKIE_MAX_AGE,
     COOKIE_NAME,
     create_token,
     get_current_admin,
     get_current_user,
     hash_password,
+    session_cookie_kwargs,
     verify_password,
 )
 from lib.db import db
@@ -27,17 +29,24 @@ async def login(body: LoginRequest, response: Response):
     response.set_cookie(
         key=COOKIE_NAME,
         value=token,
-        httponly=True,
-        samesite="lax",
-        max_age=7 * 24 * 3600,
-        path="/",
+        max_age=COOKIE_MAX_AGE,
+        **session_cookie_kwargs(),
     )
     return UserPublic(**user)
 
 
 @router.post("/auth/logout")
 async def logout(response: Response):
-    response.delete_cookie(COOKIE_NAME, path="/")
+    # Flag saat delete harus cocok dengan saat set, kalau tidak browser
+    # menganggapnya cookie lain dan sesi tidak benar-benar terhapus.
+    kwargs = session_cookie_kwargs()
+    response.delete_cookie(
+        COOKIE_NAME,
+        path=kwargs["path"],
+        secure=kwargs["secure"],
+        httponly=kwargs["httponly"],
+        samesite=kwargs["samesite"],
+    )
     return {"message": "Logout berhasil"}
 
 

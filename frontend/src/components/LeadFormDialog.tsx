@@ -321,7 +321,7 @@ export default function LeadFormDialog({
                 </Select>
               </div>
               <div className="grid gap-1.5">
-                <Label>Upload CV (PDF, maks 5 MB)</Label>
+                <Label>Upload CV (PDF, maks 4 MB)</Label>
                 <input
                   ref={fileInputRef}
                   type="file"

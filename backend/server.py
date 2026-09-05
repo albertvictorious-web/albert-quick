@@ -1,9 +1,11 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, APIRouter
+from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 import os
 import logging
+import time
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List
@@ -15,7 +17,8 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 # MongoDB connection
-from lib.db import client, db
+from lib.db import close_all, db, db_name
+from lib.auth import cookie_is_secure
 from routers.auth import router as auth_router
 from routers.catatan import router as catatan_router
 from routers.custom_fields import router as custom_fields_router
@@ -31,7 +34,9 @@ from routers.transfers import router as transfers_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     yield
-    client.close()
+    # Di serverless (Vercel) shutdown belum tentu dipanggil; ini terutama untuk
+    # uvicorn lokal supaya tidak ada koneksi Atlas yang menggantung saat reload.
+    close_all()
 
 
 # Create the main app without a prefix
@@ -54,6 +59,34 @@ class StatusCheckCreate(BaseModel):
 @api_router.get("/")
 async def root():
     return {"message": "Hello World"}
+
+
+@api_router.get("/health")
+async def health():
+    """Cek cepat setelah deploy: apakah fungsi hidup DAN Atlas benar-benar terjangkau.
+
+    Dipakai untuk membedakan tiga kegagalan yang gejalanya mirip di produksi:
+    fungsi Python tidak ke-deploy (404/HTML), env var salah, atau Atlas menolak
+    (kredensial / Network Access belum mengizinkan IP Vercel).
+    """
+    started = time.perf_counter()
+    payload = {
+        "status": "ok",
+        "database": db_name(),
+        "env": os.environ.get("VERCEL_ENV", "local"),
+        "cookie_secure": cookie_is_secure(),
+    }
+    try:
+        await db.command("ping")
+        payload["mongo"] = "connected"
+    except Exception as exc:  # noqa: BLE001 - pesan diagnostik sengaja diteruskan
+        payload["status"] = "degraded"
+        payload["mongo"] = "unreachable"
+        payload["error"] = f"{type(exc).__name__}: {exc}"[:300]
+        return JSONResponse(status_code=503, content=payload)
+
+    payload["latency_ms"] = round((time.perf_counter() - started) * 1000, 1)
+    return payload
 
 @api_router.post("/status", response_model=StatusCheck)
 async def create_status_check(input: StatusCheckCreate):

@@ -10,7 +10,7 @@ def _make_lead(client, status: str, follow_up: str) -> str:
     payload = {
         "type": "nasabah",
         "nama": f"tscheck-notif-excl-{uuid.uuid4().hex[:8]}",
-        "no_hp": "081234567890",
+        "no_wa": "081234567890",
         "sumber": "Website QuickPro",
         "status": status,
         "tanggal_follow_up": follow_up,

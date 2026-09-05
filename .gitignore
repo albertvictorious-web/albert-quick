@@ -80,13 +80,14 @@ memory/test_credentials.md
 
 # Mobile development
 android-sdk/
+# Kredensial deploy Vercel (plaintext) - jangan pernah di-commit
+vercel.env.txt
+.vercel
 
-# Testing workspace artifacts
-/tests/test-results/
-
+# Environment variables - berisi kredensial, WAJIB tidak ter-commit
 .env
-.env.*
-*.env
-credentials.json
-*.key
-.credentials
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+!.env.example

@@ -10,7 +10,7 @@ import io
 from datetime import date, datetime
 from typing import List, Tuple
 
-MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+MAX_UPLOAD_BYTES = 4 * 1024 * 1024  # 4 MB — lihat catatan di routers/files.py
 SUPPORTED_SUFFIXES = (".csv", ".xlsx", ".xlsm", ".xls")
 
 
@@ -95,7 +95,7 @@ def parse_table(filename: str, raw: bytes) -> Tuple[List[str], List[List[str]]]:
     if not raw:
         raise TableError("File kosong")
     if len(raw) > MAX_UPLOAD_BYTES:
-        raise TableError("Ukuran file maksimal 5 MB")
+        raise TableError("Ukuran file maksimal 4 MB")
 
     try:
         rows = _pick_reader(filename, raw)(raw)
