@@ -176,6 +176,10 @@ hidup terus. Perubahan berikut akan merusaknya:
 | Menjalankan background task / scheduler di dalam Function | Function berhenti setelah response terkirim |
 | Menghapus prefix `/api` dari `APIRouter` | Rewrite Vercel bersifat identitas; Function menerima path lengkap `/api/...` |
 | Mengubah `destination` rewrite `/api/:path*` menjadi `/api/index` atau lainnya | Vercel kini merutekan berdasarkan path **hasil rewrite**. Kalau destination diubah, FastAPI menerima `/api/index` dan seluruh route balas 404. Destination harus tetap identik dengan source |
+| Menghapus `"framework": null` dari `vercel.json` | Dua kerusakan sekaligus: (a) `installCommand` custom menggantikan langkah install Python sehingga `requirements.txt` tidak pernah dipasang dan Function mati dengan `ModuleNotFoundError: No module named 'fastapi'`, (b) deteksi framework FastAPI merebut routing `api/` dari file-based function. Build tetap sukses, jadi kerusakannya baru terasa saat request pertama |
+| Menambahkan `pip install`/`uv pip install` ke `installCommand` | Untuk Function `/api` native, langkah install Python tidak bisa dikustomisasi. Memasang paket saat build frontend tidak membuatnya masuk ke bundle Function |
+| Menambahkan `pyproject.toml` atau `Pipfile` di root | Bila ada bersamaan dengan `requirements.txt` tanpa lockfile, perkakas Vercel bisa memilih manifest yang belum lengkap dan tidak memasang apa pun. Satu sumber dependency saja: `requirements.txt` |
+| Menambahkan paket ke `backend/requirements.txt` lalu berharap ikut ter-deploy | Vercel hanya membaca `requirements.txt` di **root**. `backend/requirements.txt` khusus development |
 | Menambahkan kembali `memory` ke `vercel.json` | Diabaikan pada penagihan Active CPU, dan Vercel memunculkan peringatan setiap build |
 | Menempelkan route langsung ke `app` | Route di luar `/api` tidak terjangkau proxy Vite maupun rewrite Vercel |
 | Menghapus `package.json` di root repo | Vercel mendeteksi jenis project dari `package.json` di Root Directory. Tanpa berkas itu, deteksi jatuh ke "Other" dan langkah install bisa terlewat sehingga build frontend gagal |

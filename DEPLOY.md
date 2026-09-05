@@ -32,7 +32,7 @@ langsung jalan tanpa konfigurasi cross-domain.
 
 | File | Fungsi |
 |---|---|
-| `vercel.json` | Rewrite `/api/*` ke Python Function, sisanya fallback ke `index.html` (SPA). Build & output directory frontend. `includeFiles` agar folder `backend/` ikut dibundel |
+| `vercel.json` | Rewrite `/api/*` ke Python Function, sisanya fallback ke `index.html` (SPA). Build & output directory frontend. `includeFiles` agar folder `backend/` ikut dibundel. **`"framework": null` wajib ada** — lihat bagian di bawah |
 | `api/index.py` | Entrypoint Vercel. Shim tipis yang menaruh `backend/` di `sys.path` lalu `from server import app`. Vercel memuat ASGI native — **tanpa Mangum** |
 | `requirements.txt` (root) | Dependency yang di-install Vercel. Hanya paket runtime |
 | `backend/requirements.txt` | Dependency development lokal (termasuk pytest, black, mypy) — tidak dipakai Vercel |
@@ -127,7 +127,7 @@ tidak dikira kegagalan:
 |---|---|---|
 | `Running build in Washington, D.C., USA (East) – iad1` | Region **build**, bukan region Function. Vercel selalu membangun di region internalnya sendiri; `regions: ["sin1"]` di `vercel.json` mengatur tempat **Function berjalan**, dan itulah yang menentukan latency ke Atlas | Tidak ada. Verifikasi region Function di Vercel → Deployment → Functions |
 | `Internal rewrites in backend framework projects now route requests using the rewritten destination path` | Vercel mengubah perilaku: aplikasi sekarang menerima path **hasil rewrite**, bukan path asli | Tidak ada. Rewrite `/api/:path*` → `/api/:path*` di repo ini memang **identitas**, jadi FastAPI tetap menerima `/api/...` utuh. Justru **jangan** mengubah destination menjadi `/api/index`, karena FastAPI akan menerima `/api/index` dan semua route balas 404 |
-| `FastAPI static file collection failed. Static files will not be served from the CDN` | Vercel mendeteksi FastAPI dan mencoba mengumpulkan berkas statis milik backend. Backend di sini tidak menyajikan berkas statis apa pun | Tidak ada. Berkas statis aplikasi berasal dari `frontend/dist` lewat `outputDirectory`, bukan dari FastAPI |
+| `FastAPI static file collection failed. Static files will not be served from the CDN` | **Ini bukan peringatan wajar.** Artinya Vercel mendeteksi FastAPI sebagai preset framework, dan preset itu merebut routing `api/` dari file-based function sekaligus melewati install dependency Python | Pastikan `"framework": null` ada di `vercel.json`. Setelah itu baris ini seharusnya hilang. Lihat bagian `"framework": null` di atas |
 | `Provided memory setting in vercel.json is ignored on Active CPU billing` | Skema penagihan Active CPU tidak lagi memakai setelan `memory` | Sudah ditangani — `memory` dihapus dari `vercel.json` |
 | `warning Workspaces can only be enabled in private projects` | Berasal dari Yarn 1 saat memasang dependency frontend | Tidak ada. `package.json` root dan `frontend/package.json` keduanya sudah `"private": true`, dan peringatan ini tidak mempengaruhi hasil install |
 | `Some chunks are larger than 500 kB after minification` | Bundle frontend satu berkas besar (~1 MB, ~310 kB setelah gzip) | Opsional. Bisa dipecah dengan `import()` dinamis kalau waktu muat awal terasa berat |
@@ -138,6 +138,115 @@ Yang menandakan build benar-benar berhasil adalah dua baris terakhir:
 Build Completed in /vercel/output
 Deployment completed
 ```
+
+---
+
+## `"framework": null` — kenapa wajib, dan apa yang rusak tanpa itu
+
+Ini penyebab error runtime yang paling sulit dilacak di setup ini:
+
+```
+ModuleNotFoundError: No module named 'fastapi'
+```
+
+Build **sukses**, deployment **sukses**, tapi Function meledak saat request
+pertama. Ada dua sebab yang berdiri sendiri dan keduanya berasal dari sumber
+yang sama.
+
+### Sebab 1 — `installCommand` menggantikan install Python
+
+`installCommand` di `vercel.json` bersifat **override, bukan tambahan**. Builder
+Python Vercel menandai dependency sebagai "dianggap sudah terpasang" begitu ada
+install command custom, lalu **melewati** langkah sinkronisasi `uv`-nya.
+
+Karena `installCommand` di sini dipakai untuk memasang dependency frontend,
+`requirements.txt` sama sekali tidak pernah dipasang.
+
+Gejalanya di build log sangat mudah disalahartikan:
+
+```
+Using Python 3.12 from .python-version
+Using uv 0.10.11
+Running "install" command: `yarn --cwd frontend install --frozen-lockfile`...
+```
+
+Baris `Using uv` hanya membuktikan Vercel **menemukan** perkakas Python — bukan
+bahwa manifest Python di-install. Tidak ada baris install Python di antaranya.
+
+### Sebab 2 — deteksi framework FastAPI merebut routing `/api`
+
+Vercel kini punya dukungan framework FastAPI bawaan. Begitu FastAPI terdeteksi
+di manifest, **preset framework mengambil alih file-based function di `api/`**,
+sehingga `api/index.py` tidak lagi menjadi Function tersendiri. Petunjuknya di
+build log:
+
+```
+Warning: FastAPI static file collection failed. Static files will not be served from the CDN.
+```
+
+Aplikasi ini butuh model **file-based function**, bukan preset framework,
+karena SPA-nya dibangun terpisah dan disajikan dari `frontend/dist`.
+
+### Perbaikannya
+
+`"framework": null` memilih jalur Other/tanpa-framework. Efeknya dua-duanya
+sekaligus:
+
+1. `api/index.py` kembali menjadi Python Function, dan **builder Python
+   menjalankan instalasi dependency-nya sendiri** dari `requirements.txt` di
+   root — terlepas dari `installCommand`
+2. Preset FastAPI tidak lagi bersaing dengan SPA statis
+
+`installCommand` dan `buildCommand` tetap dipakai untuk frontend. Jangan
+mencoba menambahkan `pip install` atau `uv pip install` ke `installCommand`:
+untuk Function `/api` yang didukung native, langkah install Python **tidak bisa
+dikustomisasi**, dan memasang paket saat build frontend tidak membuatnya masuk
+ke bundle Function.
+
+Kalau schema Vercel menolak nilai JSON `null`, hapus properti `framework` dari
+berkas dan pilih **Other** di Project Settings → General → Framework Preset.
+
+### Cara memastikan dependency benar-benar terpasang
+
+Build log tidak bisa dijadikan bukti. Setelah deploy, panggil `/api/health` —
+endpoint itu mencantumkan versi paket yang benar-benar ada di bundle Function:
+
+```bash
+curl https://NAMA-PROJECT.vercel.app/api/health
+```
+
+```json
+{
+  "status": "ok",
+  "database": "quickpro_crm",
+  "env": "production",
+  "region": "sin1",
+  "cookie_secure": true,
+  "runtime": {
+    "python": "3.12.x",
+    "fastapi": "0.141.1",
+    "motor": "3.7.1",
+    "pymongo": "4.17.0"
+  },
+  "mongo": "connected",
+  "latency_ms": 12.4
+}
+```
+
+Kalau endpoint ini membalas JSON sama sekali, `requirements.txt` sudah pasti
+terpasang. Kalau balasannya `500` dengan `ModuleNotFoundError`, berarti
+`framework: null` hilang atau `installCommand` kembali menimpa install Python.
+
+`region` di balasan itu juga menunjukkan region **Function** yang sebenarnya —
+inilah cara memverifikasi `regions: ["sin1"]` berlaku, bukan dari baris region
+build di log.
+
+### Jangan tambahkan `pyproject.toml`
+
+Ada bug yang diketahui: bila `pyproject.toml` dan `requirements.txt` ada
+bersamaan **tanpa** lockfile, perkakas Vercel bisa memilih `pyproject.toml`
+yang belum lengkap dan akhirnya tidak memasang apa pun. Pilih satu sumber
+dependency. Repo ini memakai `requirements.txt` saja.
 
 ---
 
@@ -203,6 +312,8 @@ python seed.py --reset    # hapus leads/jadwal/catatan lalu isi ulang
 | `/api/health` membalas HTML | Root Directory di-set ke `frontend`. Kosongkan |
 | `/api/*` → 404 semua | Prefix `/api` di `APIRouter` terhapus. Rewrite bersifat identitas, fungsi menerima path lengkap `/api/...` — prefix harus dipertahankan |
 | `ModuleNotFoundError: server` | `includeFiles: "backend/**"` hilang dari `vercel.json` |
+| `ModuleNotFoundError: No module named 'fastapi'` (build sukses, Function 500) | `"framework": null` hilang dari `vercel.json`. `installCommand` custom menggantikan langkah install Python, dan deteksi framework FastAPI merebut routing `api/`. Lihat bagian `"framework": null` di atas |
+| `ModuleNotFoundError` untuk paket lain | Paket belum ada di `requirements.txt` **root**. `backend/requirements.txt` tidak dipakai Vercel |
 | `mongo: unreachable` di `/api/health` | `MONGO_URL` salah / password belum di-URL-encode / Network Access Atlas belum `0.0.0.0/0` |
 | `bad auth: authentication failed` | User database yang dipakai di `MONGO_URL` salah, atau password belum di-URL-encode. Verifikasi user di Atlas → Database Access |
 | Login sukses tapi langsung ter-logout | `SECRET_KEY` berbeda antar deployment, atau belum di-set di environment yang dipakai |
