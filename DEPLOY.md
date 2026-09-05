@@ -56,24 +56,11 @@ git push origin main
 ### 2. Import project di Vercel
 
 1. [vercel.com/new](https://vercel.com/new) → pilih repo `albert-quick`
-2. **Root Directory: `./` (root repository).**
-   Ini kesalahan paling sering dan paling menyesatkan. Kalau diarahkan ke
-   `frontend`, folder `api/` dan `backend/` berada di luar jangkauan build:
-   fungsi Python tidak ikut ter-deploy, dan `/api/*` justru membalas
-   `index.html`. Frontend tampak normal, tapi semua pemanggilan API gagal
-   dengan error parsing JSON.
-3. Framework Preset: **Other**. Jangan mengisi Build Command dan Output
-   Directory lewat UI — keduanya sudah ditentukan `vercel.json`, dan nilai di
-   UI akan menimpanya secara diam-diam.
-
-Susunan yang membuat Root Directory `./` bekerja:
-
-| Berkas | Peran |
-|---|---|
-| `package.json` (root) | Membuat Vercel mengenali project di root dan menjalankan langkah install. Tanpa berkas ini deteksi jatuh ke "Other" dan install bisa terlewat sehingga build frontend gagal. Tidak punya dependency sendiri — semua script mendelegasikan ke `frontend/` |
-| `vercel.json` | `installCommand`/`buildCommand` menunjuk ke `frontend/`; `outputDirectory` = `frontend/dist`, relatif terhadap root |
-| `requirements.txt` (root) | Manifest Python. Vercel mencarinya di Root Directory, bukan di `backend/` |
-| `api/index.py` | Titik masuk Function, terdeteksi karena berada di `api/` pada Root Directory |
+2. **Root Directory: biarkan kosong (root repo).**
+   Ini kesalahan paling sering: kalau di-set ke `frontend`, Vercel tidak akan
+   melihat folder `api/` dan `backend/`, sehingga `/api/*` membalas HTML.
+3. Framework Preset: **Other**. `vercel.json` sudah menentukan build sendiri,
+   jadi jangan isi Build/Output Directory secara manual.
 
 ### 3. Isi Environment Variables
 
@@ -128,6 +115,29 @@ curl -I https://NAMA-PROJECT.vercel.app/data-leads
 > Kalau region `sin1` tidak tersedia di plan Anda, hapus baris `"regions"` — app
 > tetap jalan, hanya lebih lambat. Jangan sebaliknya: memindahkan cluster Atlas
 > ke region lain berarti membuat cluster baru dan migrasi data.
+
+---
+
+## Peringatan di build log yang memang wajar
+
+Build yang sukses tetap memunculkan beberapa peringatan. Berikut artinya, agar
+tidak dikira kegagalan:
+
+| Peringatan | Arti | Tindakan |
+|---|---|---|
+| `Running build in Washington, D.C., USA (East) – iad1` | Region **build**, bukan region Function. Vercel selalu membangun di region internalnya sendiri; `regions: ["sin1"]` di `vercel.json` mengatur tempat **Function berjalan**, dan itulah yang menentukan latency ke Atlas | Tidak ada. Verifikasi region Function di Vercel → Deployment → Functions |
+| `Internal rewrites in backend framework projects now route requests using the rewritten destination path` | Vercel mengubah perilaku: aplikasi sekarang menerima path **hasil rewrite**, bukan path asli | Tidak ada. Rewrite `/api/:path*` → `/api/:path*` di repo ini memang **identitas**, jadi FastAPI tetap menerima `/api/...` utuh. Justru **jangan** mengubah destination menjadi `/api/index`, karena FastAPI akan menerima `/api/index` dan semua route balas 404 |
+| `FastAPI static file collection failed. Static files will not be served from the CDN` | Vercel mendeteksi FastAPI dan mencoba mengumpulkan berkas statis milik backend. Backend di sini tidak menyajikan berkas statis apa pun | Tidak ada. Berkas statis aplikasi berasal dari `frontend/dist` lewat `outputDirectory`, bukan dari FastAPI |
+| `Provided memory setting in vercel.json is ignored on Active CPU billing` | Skema penagihan Active CPU tidak lagi memakai setelan `memory` | Sudah ditangani — `memory` dihapus dari `vercel.json` |
+| `warning Workspaces can only be enabled in private projects` | Berasal dari Yarn 1 saat memasang dependency frontend | Tidak ada. `package.json` root dan `frontend/package.json` keduanya sudah `"private": true`, dan peringatan ini tidak mempengaruhi hasil install |
+| `Some chunks are larger than 500 kB after minification` | Bundle frontend satu berkas besar (~1 MB, ~310 kB setelah gzip) | Opsional. Bisa dipecah dengan `import()` dinamis kalau waktu muat awal terasa berat |
+
+Yang menandakan build benar-benar berhasil adalah dua baris terakhir:
+
+```
+Build Completed in /vercel/output
+Deployment completed
+```
 
 ---
 
@@ -190,7 +200,7 @@ python seed.py --reset    # hapus leads/jadwal/catatan lalu isi ulang
 
 | Gejala | Penyebab & solusi |
 |---|---|
-| `/api/health` membalas HTML | Root Directory bukan `./`. Kemungkinan diarahkan ke `frontend`, sehingga `api/` dan `backend/` tidak ikut ter-deploy |
+| `/api/health` membalas HTML | Root Directory di-set ke `frontend`. Kosongkan |
 | `/api/*` → 404 semua | Prefix `/api` di `APIRouter` terhapus. Rewrite bersifat identitas, fungsi menerima path lengkap `/api/...` — prefix harus dipertahankan |
 | `ModuleNotFoundError: server` | `includeFiles: "backend/**"` hilang dari `vercel.json` |
 | `mongo: unreachable` di `/api/health` | `MONGO_URL` salah / password belum di-URL-encode / Network Access Atlas belum `0.0.0.0/0` |

@@ -175,6 +175,8 @@ hidup terus. Perubahan berikut akan merusaknya:
 | Menambah `minPoolSize > 0` | Menahan koneksi idle di banyak instance serverless |
 | Menjalankan background task / scheduler di dalam Function | Function berhenti setelah response terkirim |
 | Menghapus prefix `/api` dari `APIRouter` | Rewrite Vercel bersifat identitas; Function menerima path lengkap `/api/...` |
+| Mengubah `destination` rewrite `/api/:path*` menjadi `/api/index` atau lainnya | Vercel kini merutekan berdasarkan path **hasil rewrite**. Kalau destination diubah, FastAPI menerima `/api/index` dan seluruh route balas 404. Destination harus tetap identik dengan source |
+| Menambahkan kembali `memory` ke `vercel.json` | Diabaikan pada penagihan Active CPU, dan Vercel memunculkan peringatan setiap build |
 | Menempelkan route langsung ke `app` | Route di luar `/api` tidak terjangkau proxy Vite maupun rewrite Vercel |
 | Menghapus `package.json` di root repo | Vercel mendeteksi jenis project dari `package.json` di Root Directory. Tanpa berkas itu, deteksi jatuh ke "Other" dan langkah install bisa terlewat sehingga build frontend gagal |
 | Mengubah Root Directory di Vercel menjadi `frontend` | Wajib `./` (root repo). Lihat catatan di bawah |
