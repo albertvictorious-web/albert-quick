@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+#
+# Hook pre-commit: menolak commit yang identitasnya akan memblokir deployment
+# Vercel, dan menahan kredensial agar tidak ikut ter-commit.
+#
+# Aktifkan sekali per clone:
+#   git config --local core.hooksPath .githooks
+#
+# Alasan hook ini ada: Vercel menolak deployment bila email author sebuah commit
+# tidak bisa dicocokkan ke akun GitHub. Kesalahannya baru terlihat jauh di
+# belakang — setelah PR dibuat dan deployment gagal — padahal penyebabnya cuma
+# metadata commit. Lebih murah dicegah di sini.
+
+set -uo pipefail
+
+CORRECT_NAME="albertvictorious-web"
+CORRECT_EMAIL="324408409+albertvictorious-web@users.noreply.github.com"
+
+red()    { printf '\033[31m%s\033[0m\n' "$1"; }
+yellow() { printf '\033[33m%s\033[0m\n' "$1"; }
+
+fail() {
+  red ""
+  red "COMMIT DIBATALKAN"
+  red ""
+  printf '%s\n' "$1"
+  red ""
+  exit 1
+}
+
+# ---------------------------------------------------------------------------
+# 1. Identitas commit
+# ---------------------------------------------------------------------------
+AUTHOR_EMAIL="$(git config user.email || true)"
+AUTHOR_NAME="$(git config user.name || true)"
+
+if [ -z "$AUTHOR_EMAIL" ]; then
+  fail "user.email belum di-set.
+
+Jalankan:
+  git config --local include.path ../.gitconfig
+
+Atau set langsung:
+  git config --local user.name  \"$CORRECT_NAME\"
+  git config --local user.email \"$CORRECT_EMAIL\""
+fi
+
+# Pola email yang PASTI bukan akun GitHub. Deployment Vercel akan diblokir.
+BLOCKED_PATTERN='@emergent\.sh$|^bot@|@users\.noreply\.localhost$|@anthropic\.com$|@openai\.com$|@example\.com$|@localhost$|^root@|@\(none\)$|^.*@.*\.local$'
+
+if printf '%s' "$AUTHOR_EMAIL" | grep -qiE "$BLOCKED_PATTERN"; then
+  fail "Email commit tidak bisa dicocokkan ke akun GitHub:
+
+  $AUTHOR_NAME <$AUTHOR_EMAIL>
+
+Vercel akan menolak deployment dengan pesan:
+  'The deployment was blocked because the commit email could not be
+   matched to a GitHub account.'
+
+Perbaiki dengan:
+  git config --local user.name  \"$CORRECT_NAME\"
+  git config --local user.email \"$CORRECT_EMAIL\"
+
+Lihat AGENTS.md bagian 1."
+fi
+
+if ! printf '%s' "$AUTHOR_EMAIL" | grep -qE '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'; then
+  fail "Email commit tidak berbentuk alamat email yang sah: '$AUTHOR_EMAIL'"
+fi
+
+if [ "$AUTHOR_EMAIL" != "$CORRECT_EMAIL" ]; then
+  yellow ""
+  yellow "Peringatan: email commit bukan identitas standar repo ini."
+  yellow "  dipakai   : $AUTHOR_NAME <$AUTHOR_EMAIL>"
+  yellow "  standar   : $CORRECT_NAME <$CORRECT_EMAIL>"
+  yellow ""
+  yellow "Commit diteruskan karena email ini mungkin memang milik akun GitHub"
+  yellow "Anda. Pastikan alamat tersebut terdaftar di GitHub, kalau tidak"
+  yellow "deployment Vercel akan diblokir."
+  yellow ""
+fi
+
+# ---------------------------------------------------------------------------
+# 2. Kredensial di staging area
+# ---------------------------------------------------------------------------
+SECRET_PATTERN='mongodb\+srv://[A-Za-z0-9._%+-]+:[^@[:space:]"]+@|github_pat_[A-Za-z0-9_]{20,}|ghp_[A-Za-z0-9]{30,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|AKIA[0-9A-Z]{16}'
+
+# Hanya berkas teks yang diperiksa; --diff-filter=d melewati berkas terhapus.
+FOUND="$(git diff --cached --diff-filter=d -U0 -G"$SECRET_PATTERN" --name-only 2>/dev/null || true)"
+
+if [ -n "$FOUND" ]; then
+  fail "Terdeteksi kemungkinan kredensial pada berkas berikut:
+
+$(printf '%s\n' "$FOUND" | sed 's/^/  /')
+
+Pindahkan nilainya ke backend/.env (lokal) atau Environment Variables Vercel
+(produksi), lalu baca lewat os.environ.
+
+Kalau ini benar-benar bukan rahasia:
+  git commit --no-verify
+
+Tapi jangan pakai --no-verify untuk menembus pemeriksaan identitas di atas."
+fi
+
+# ---------------------------------------------------------------------------
+# 3. Berkas yang tidak boleh masuk repo
+# ---------------------------------------------------------------------------
+STAGED="$(git diff --cached --name-only --diff-filter=d || true)"
+OFFENDERS="$(printf '%s\n' "$STAGED" | grep -E '^(backend/\.env|frontend/\.env|\.env|vercel\.env\.txt|backend_test\.py|test_result\.md|yarn\.lock)$|(^|/)node_modules/|(^|/)__pycache__/|\.pyc$|^frontend/dist/' || true)"
+
+if [ -n "$OFFENDERS" ]; then
+  fail "Berkas berikut tidak boleh masuk repository:
+
+$(printf '%s\n' "$OFFENDERS" | sed 's/^/  /')
+
+Keluarkan dari staging area:
+  git reset HEAD <berkas>
+
+Lihat AGENTS.md bagian 3."
+fi
+
+exit 0

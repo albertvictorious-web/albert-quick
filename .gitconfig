@@ -1,3 +1,27 @@
+# Identitas Git untuk repository ini.
+#
+# KENAPA BERKAS INI ADA
+# Vercel menolak deployment bila email author sebuah commit tidak bisa
+# dicocokkan ke akun GitHub:
+#
+#   "The deployment was blocked because the commit email <email> could not be
+#    matched to a GitHub account."
+#
+# Alamat di bawah adalah noreply GitHub berbasis ID akun. GitHub selalu
+# memetakannya ke akun albertvictorious-web, jadi Vercel selalu bisa
+# mencocokkannya dan alamat pribadi tidak perlu dibocorkan.
+#
+# CARA MENGAKTIFKAN (sekali per clone)
+#   git config --local include.path ../.gitconfig
+#   git config --local core.hooksPath .githooks
+#
+# Git tidak membaca berkas ini secara otomatis — harus di-include seperti di
+# atas, atau nilainya di-set manual ke git config --local.
+#
+# JANGAN memakai email platform/agent seperti agent@emergent.sh atau
+# github@emergent.sh. Keduanya bukan akun GitHub dan akan memblokir deployment.
+# Selengkapnya: AGENTS.md bagian 1.
+
 [user]
-	email = github@emergent.sh
-	name = emergent-agent-e1
+	name = albertvictorious-web
+	email = 324408409+albertvictorious-web@users.noreply.github.com

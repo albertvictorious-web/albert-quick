@@ -189,15 +189,29 @@ albert-quick/
 ├── backend/                Aplikasi FastAPI
 ├── frontend/               Aplikasi React
 ├── tests/                  Workspace Playwright (end-to-end)
+├── .github/                GitHub Actions — pemeriksaan identitas commit (perlu diaktifkan, lihat AGENTS.md)
+├── .githooks/              Hook Git bersama (pre-commit)
+├── package.json            Penanda project di root agar Root Directory Vercel bisa "./"
 ├── vercel.json             Konfigurasi routing & build Vercel
 ├── requirements.txt        Dependency yang di-install Vercel
 ├── .python-version         Pin versi Python di Vercel
 ├── .vercelignore           File yang tidak diunggah ke Vercel
+├── .gitconfig              Identitas Git repo ini (harus di-include manual)
 ├── .env.example            Contoh environment variables
-├── test_core.py            POC: pembuktian fondasi Atlas & dependency
+├── AGENTS.md               Aturan wajib untuk AI coding agent
 ├── DEPLOY.md               Panduan deploy langkah demi langkah
+├── test_core.py            POC: pembuktian fondasi Atlas & dependency
 └── design_guidelines.json  Acuan visual (warna, tipografi, spasi)
 ```
+
+Berkas di root yang mudah disalahpahami:
+
+| Berkas | Kenapa ada |
+|---|---|
+| `package.json` | **Tidak punya dependency.** Fungsinya membuat Vercel mengenali project di root, sehingga Root Directory bisa diisi `./` dan folder `api/`, `backend/`, `frontend/` terlihat semua. Seluruh script mendelegasikan ke `frontend/` |
+| `requirements.txt` | Dependency Python yang di-install Vercel. Berbeda dari `backend/requirements.txt` yang memuat perkakas development seperti pytest dan mypy |
+| `.gitconfig` | Identitas Git yang dijamin cocok dengan akun GitHub. Git tidak membacanya otomatis — aktifkan dengan `git config --local include.path ../.gitconfig` |
+| `AGENTS.md` | Aturan yang harus dipatuhi AI coding agent, terutama soal identitas commit yang bisa memblokir deployment Vercel |
 
 ### `api/` — jembatan ke Vercel
 
@@ -541,8 +555,12 @@ sebagai database. Langkah lengkap, batasan platform yang perlu diperhatikan,
 dan tabel troubleshooting ada di **[DEPLOY.md](DEPLOY.md)**.
 
 Ringkasnya: push ke GitHub → import repo di Vercel dengan Root Directory
-**dibiarkan kosong** → isi tiga environment variable → deploy → verifikasi
+**`./` (root repository)** → isi tiga environment variable → deploy → verifikasi
 lewat `/api/health`.
+
+Root Directory harus root, bukan `frontend`, karena hanya dari sana Vercel bisa
+melihat `api/`, `backend/`, dan `frontend/` sekaligus. `package.json` di root
+ada khusus supaya Vercel mengenali project di posisi itu.
 
 ---
 
