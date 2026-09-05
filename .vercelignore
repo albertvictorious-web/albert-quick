@@ -1,0 +1,30 @@
+# Jangan kirim hal-hal ini ke build Vercel: memperlambat upload dan menggemukkan
+# bundle Python Function.
+
+node_modules
+frontend/node_modules
+frontend/dist
+
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Kredensial & konfigurasi lokal — di Vercel semua lewat Environment Variables.
+.env
+.env.*
+backend/.env
+frontend/.env
+
+# Artefak khusus environment preview Emergent, tidak relevan di produksi.
+.emergent
+tests
+test_reports
+backend/tests
+test_core.py
+test_result.md
+memory
+plan.md
+TEMPLATE.md

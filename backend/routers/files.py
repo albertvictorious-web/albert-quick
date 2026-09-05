@@ -13,7 +13,12 @@ from models.lead import UploadedFile
 
 router = APIRouter()
 
-MAX_BYTES = 5 * 1024 * 1024  # 5 MB
+MAX_BYTES = 4 * 1024 * 1024  # 4 MB
+# Kenapa 4 MB, bukan 5: Vercel Functions membatasi body request 4.5 MB. Upload
+# multipart menambah header/boundary di atas ukuran file, jadi 4 MB memberi
+# ruang aman. Kalau lewat, Vercel menolak request sebelum FastAPI dipanggil —
+# artinya user akan lihat error platform, bukan pesan Bahasa Indonesia kita.
+MAX_LABEL = "4 MB"
 ALLOWED_TYPES = {"application/pdf"}
 
 
@@ -23,7 +28,7 @@ async def upload_cv(file: UploadFile = File(...), user: dict = Depends(get_curre
     if not raw:
         raise HTTPException(status_code=400, detail="File kosong")
     if len(raw) > MAX_BYTES:
-        raise HTTPException(status_code=400, detail="Ukuran file maksimal 5 MB")
+        raise HTTPException(status_code=400, detail=f"Ukuran file maksimal {MAX_LABEL}")
     filename = file.filename or "cv.pdf"
     if file.content_type not in ALLOWED_TYPES and not filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Hanya file PDF yang diperbolehkan")

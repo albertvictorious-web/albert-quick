@@ -12,7 +12,7 @@ def test_reschedule_future_date_clears_notification():
     payload = {
         "type": "nasabah",
         "nama": f"tscheck-reschedule-{uuid.uuid4().hex[:8]}",
-        "no_hp": "081234567891",
+        "no_wa": "081234567891",
         "sumber": "Website QuickPro",
         "status": "Follow Up",
         "tanggal_follow_up": overdue_date,

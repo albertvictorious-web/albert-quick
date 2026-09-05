@@ -12,7 +12,7 @@ def test_note_with_terminal_status_removes_lead_from_notifications():
     payload = {
         "type": "nasabah",
         "nama": f"tscheck-noteclose-{uuid.uuid4().hex[:8]}",
-        "no_hp": "081234567892",
+        "no_wa": "081234567892",
         "sumber": "Website QuickPro",
         "status": "Follow Up",
         "tanggal_follow_up": overdue_date,
