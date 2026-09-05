@@ -5,7 +5,9 @@ from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 import os
 import logging
+import platform
 import time
+from importlib.metadata import version
 from pathlib import Path
 from pydantic import BaseModel, Field
 from typing import List
@@ -65,16 +67,29 @@ async def root():
 async def health():
     """Cek cepat setelah deploy: apakah fungsi hidup DAN Atlas benar-benar terjangkau.
 
-    Dipakai untuk membedakan tiga kegagalan yang gejalanya mirip di produksi:
-    fungsi Python tidak ke-deploy (404/HTML), env var salah, atau Atlas menolak
-    (kredensial / Network Access belum mengizinkan IP Vercel).
+    Dipakai untuk membedakan empat kegagalan yang gejalanya mirip di produksi:
+    fungsi Python tidak ke-deploy (404/HTML), dependency Python tidak terpasang
+    (ModuleNotFoundError sebelum endpoint ini sempat jalan), env var salah, atau
+    Atlas menolak (kredensial / Network Access belum mengizinkan IP Vercel).
+
+    Blok "runtime" sengaja mencantumkan versi paket: kalau endpoint ini membalas
+    sama sekali, artinya requirements.txt memang terpasang di bundle Function —
+    bukti yang tidak bisa didapat dari build log, karena build bisa sukses
+    walaupun dependency Python tidak pernah di-install.
     """
     started = time.perf_counter()
     payload = {
         "status": "ok",
         "database": db_name(),
         "env": os.environ.get("VERCEL_ENV", "local"),
+        "region": os.environ.get("VERCEL_REGION", "local"),
         "cookie_secure": cookie_is_secure(),
+        "runtime": {
+            "python": platform.python_version(),
+            "fastapi": version("fastapi"),
+            "motor": version("motor"),
+            "pymongo": version("pymongo"),
+        },
     }
     try:
         await db.command("ping")
